@@ -9,7 +9,8 @@ import { showError, showSuccess } from '@/utils/toast';
 import { Button } from '@/components/ui/button';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import SetUsernameDialog from '@/components/SetUsernameDialog';
-import { isPointInPolygon } from '@/utils/geometry'; // Import the new utility
+import { isPointInPolygon } from '@/utils/geometry';
+import Leaderboard from '@/components/Leaderboard'; // Import Leaderboard
 
 // Fix for default Leaflet icon issues with Webpack/Vite
 delete L.Icon.Default.prototype._getIconUrl;
@@ -28,7 +29,8 @@ interface Player {
   current_lng: number;
   territory: L.LatLngExpression[][];
   is_alive: boolean;
-  last_killed_at: string | null; // Added for future use
+  last_killed_at: string | null;
+  score: number; // Added score
 }
 
 // Component to update map view to current location
@@ -51,6 +53,7 @@ const GamePage = () => {
   const [currentPath, setCurrentPath] = useState<L.LatLngExpression[]>([]);
   const [playerTerritory, setPlayerTerritory] = useState<L.LatLngExpression[][]>([]);
   const [isPlayerAlive, setIsPlayerAlive] = useState(true);
+  const [playerScore, setPlayerScore] = useState(0); // New state for current player's score
   const watchId = useRef<number | null>(null);
 
   // Function to stop GPS tracking
@@ -68,7 +71,7 @@ const GamePage = () => {
     const fetchPlayerProfile = async () => {
       const { data, error } = await supabase
         .from('players')
-        .select('username, territory, is_alive')
+        .select('username, territory, is_alive, score') // Fetch score
         .eq('user_id', session.user.id)
         .single();
 
@@ -80,6 +83,7 @@ const GamePage = () => {
         setUsername(data.username);
         setPlayerTerritory(data.territory || []);
         setIsPlayerAlive(data.is_alive);
+        setPlayerScore(data.score || 0); // Set player's score
         setIsUsernameDialogOpen(false);
       } else {
         setIsUsernameDialogOpen(true);
@@ -112,6 +116,7 @@ const GamePage = () => {
           if (payload.eventType === 'UPDATE' && newPlayer?.user_id === session.user.id) {
             setPlayerTerritory(newPlayer.territory || []);
             setIsPlayerAlive(newPlayer.is_alive);
+            setPlayerScore(newPlayer.score || 0); // Update current player's score
           }
           return;
         }
@@ -212,7 +217,7 @@ const GamePage = () => {
       stopWatchingLocation(); // Cleanup on unmount or dependency change
       playersSubscription.unsubscribe();
     };
-  }, [session, supabase, username, isPlayerAlive, otherPlayers]); // Added otherPlayers to dependencies for collision check
+  }, [session, supabase, username, isPlayerAlive, otherPlayers]);
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -228,6 +233,14 @@ const GamePage = () => {
     setIsUsernameDialogOpen(false);
   };
 
+  const calculateScore = (territory: L.LatLngExpression[][]): number => {
+    let totalPoints = 0;
+    territory.forEach(polygon => {
+      totalPoints += polygon.length;
+    });
+    return totalPoints;
+  };
+
   const handleClaimTerritory = async () => {
     if (currentPath.length < 3) {
       showError('Path is too short to claim territory.');
@@ -239,10 +252,11 @@ const GamePage = () => {
     }
 
     const newTerritory = [...playerTerritory, currentPath];
+    const newScore = calculateScore(newTerritory);
 
     const { error } = await supabase
       .from('players')
-      .update({ territory: newTerritory, updated_at: new Date().toISOString() })
+      .update({ territory: newTerritory, score: newScore, updated_at: new Date().toISOString() })
       .eq('user_id', session?.user?.id);
 
     if (error) {
@@ -251,6 +265,7 @@ const GamePage = () => {
     } else {
       showSuccess('Territory claimed successfully!');
       setPlayerTerritory(newTerritory);
+      setPlayerScore(newScore); // Update local score state
       setCurrentPath([]);
     }
   };
@@ -265,7 +280,8 @@ const GamePage = () => {
         current_lat: null,
         current_lng: null,
         territory: [],
-        last_killed_at: null, // Clear last_killed_at on respawn
+        last_killed_at: null,
+        score: 0, // Reset score on respawn
         updated_at: new Date().toISOString(),
       })
       .eq('user_id', session.user.id);
@@ -278,6 +294,7 @@ const GamePage = () => {
       setIsPlayerAlive(true);
       setCurrentPath([]);
       setPlayerTerritory([]);
+      setPlayerScore(0); // Reset local score state
       setCurrentLocation(null);
     }
   };
@@ -305,6 +322,7 @@ const GamePage = () => {
         <h1 className="text-xl font-bold">Paper.io GPS Game</h1>
         <div className="flex items-center space-x-4">
           {username && <span className="text-lg">Player: {username} {isPlayerAlive ? '(Alive)' : '(Dead)'}</span>}
+          {username && <span className="text-lg">Score: {playerScore}</span>} {/* Display player's score */}
           {isPlayerAlive ? (
             <Button onClick={handleClaimTerritory} variant="secondary" disabled={currentPath.length < 3}>
               Claim Territory
@@ -363,6 +381,7 @@ const GamePage = () => {
             </React.Fragment>
           ))}
         </MapContainer>
+        <Leaderboard /> {/* Add the Leaderboard component */}
       </div>
       {session?.user?.id && (
         <SetUsernameDialog
