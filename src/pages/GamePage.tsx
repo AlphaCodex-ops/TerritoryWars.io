@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline, Polygon } from 'react-leaflet'; // Added Polyline, Polygon
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { useSupabase } from '@/components/SessionContextProvider';
@@ -25,6 +25,7 @@ interface Player {
   username: string;
   current_lat: number;
   current_lng: number;
+  territory: L.LatLngExpression[][]; // Added territory
   is_alive: boolean;
 }
 
@@ -45,6 +46,8 @@ const GamePage = () => {
   const [username, setUsername] = useState<string | null>(null);
   const [isUsernameDialogOpen, setIsUsernameDialogOpen] = useState(false);
   const [otherPlayers, setOtherPlayers] = useState<Player[]>([]);
+  const [currentPath, setCurrentPath] = useState<L.LatLngExpression[]>([]); // State for current path
+  const [playerTerritory, setPlayerTerritory] = useState<L.LatLngExpression[][]>([]); // State for claimed territory
   const watchId = useRef<number | null>(null);
 
   useEffect(() => {
@@ -53,7 +56,7 @@ const GamePage = () => {
     const fetchPlayerProfile = async () => {
       const { data, error } = await supabase
         .from('players')
-        .select('username')
+        .select('username, territory') // Fetch territory as well
         .eq('user_id', session.user.id)
         .single();
 
@@ -61,8 +64,9 @@ const GamePage = () => {
         showError('Failed to fetch player profile: ' + error.message);
         console.error('Error fetching player profile:', error);
         setIsUsernameDialogOpen(true);
-      } else if (data && data.username) {
+      } else if (data) {
         setUsername(data.username);
+        setPlayerTerritory(data.territory || []); // Initialize player territory
         setIsUsernameDialogOpen(false);
       } else {
         setIsUsernameDialogOpen(true);
@@ -93,7 +97,10 @@ const GamePage = () => {
         const oldPlayer = payload.old as Player;
 
         if (newPlayer?.user_id === session.user.id || oldPlayer?.user_id === session.user.id) {
-          // Ignore changes for the current user, as their location is handled by watchPosition
+          // If the change is for the current user, update their territory if it's an update event
+          if (payload.eventType === 'UPDATE' && newPlayer?.user_id === session.user.id) {
+            setPlayerTerritory(newPlayer.territory || []);
+          }
           return;
         }
 
@@ -117,7 +124,9 @@ const GamePage = () => {
         watchId.current = navigator.geolocation.watchPosition(
           async (position) => {
             const { latitude, longitude } = position.coords;
+            const newLocation: L.LatLngExpression = [latitude, longitude];
             setCurrentLocation({ lat: latitude, lng: longitude });
+            setCurrentPath((prevPath) => [...prevPath, newLocation]); // Add to current path
 
             // Update player's location in Supabase
             const { error } = await supabase
@@ -173,6 +182,32 @@ const GamePage = () => {
     setIsUsernameDialogOpen(false);
   };
 
+  const handleClaimTerritory = async () => {
+    if (currentPath.length < 3) {
+      showError('Path is too short to claim territory.');
+      return;
+    }
+
+    // For simplicity, we'll just add the current path as a new polygon.
+    // A real Paper.io game would involve complex geometric calculations
+    // to determine the enclosed area and merge with existing territory.
+    const newTerritory = [...playerTerritory, currentPath];
+
+    const { error } = await supabase
+      .from('players')
+      .update({ territory: newTerritory, updated_at: new Date().toISOString() })
+      .eq('user_id', session?.user?.id);
+
+    if (error) {
+      showError('Failed to claim territory: ' + error.message);
+      console.error('Error claiming territory:', error);
+    } else {
+      showSuccess('Territory claimed successfully!');
+      setPlayerTerritory(newTerritory);
+      setCurrentPath([]); // Clear the current path after claiming
+    }
+  };
+
   if (!currentLocation) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white p-4">
@@ -196,6 +231,9 @@ const GamePage = () => {
         <h1 className="text-xl font-bold">Paper.io GPS Game</h1>
         <div className="flex items-center space-x-4">
           {username && <span className="text-lg">Player: {username}</span>}
+          <Button onClick={handleClaimTerritory} variant="secondary" disabled={currentPath.length < 3}>
+            Claim Territory
+          </Button>
           <Button onClick={handleLogout} variant="secondary">Logout</Button>
         </div>
       </header>
@@ -222,14 +260,30 @@ const GamePage = () => {
             </>
           )}
 
+          {/* Render current player's claimed territory */}
+          {playerTerritory.map((polygon, index) => (
+            <Polygon key={`player-territory-${index}`} positions={polygon} pathOptions={{ color: 'blue', fillColor: 'lightblue', fillOpacity: 0.5 }} />
+          ))}
+
+          {/* Render current player's path */}
+          {currentPath.length > 1 && (
+            <Polyline positions={currentPath} pathOptions={{ color: 'blue', weight: 5 }} />
+          )}
+
+          {/* Render other players' markers and territories */}
           {otherPlayers.map((player) => (
-            player.current_lat && player.current_lng && (
-              <Marker key={player.user_id} position={[player.current_lat, player.current_lng]}>
-                <Popup>
-                  Player: {player.username} <br /> Lat: {player.current_lat.toFixed(4)}, Lng: {player.current_lng.toFixed(4)}
-                </Popup>
-              </Marker>
-            )
+            <React.Fragment key={player.user_id}>
+              {player.current_lat && player.current_lng && (
+                <Marker position={[player.current_lat, player.current_lng]}>
+                  <Popup>
+                    Player: {player.username} <br /> Lat: {player.current_lat.toFixed(4)}, Lng: {player.current_lng.toFixed(4)}
+                  </Popup>
+                </Marker>
+              )}
+              {player.territory && player.territory.map((polygon, index) => (
+                <Polygon key={`other-player-${player.user_id}-territory-${index}`} positions={polygon} pathOptions={{ color: 'red', fillColor: 'pink', fillOpacity: 0.3 }} />
+              ))}
+            </React.Fragment>
           ))}
         </MapContainer>
       </div>
