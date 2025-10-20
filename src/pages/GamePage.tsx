@@ -372,13 +372,31 @@ const GamePage = () => {
               if (newlyClaimedTurfPolygon && turf.booleanIntersects(newlyClaimedTurfPolygon, existingTurfPolygon)) {
                 changed = true;
                 showSuccess(`You captured a piece of ${otherPlayer.username}'s territory!`);
-                // For simplicity, we remove the entire polygon if it intersects.
-                // More advanced logic would use turf.difference to subtract the intersection.
+                
+                const remainingTurf = turf.difference(existingTurfPolygon, newlyClaimedTurfPolygon);
+
+                if (remainingTurf) {
+                  if (remainingTurf.geometry.type === 'Polygon') {
+                    // Convert Polygon to L.LatLngExpression[][]
+                    const newCoords = remainingTurf.geometry.coordinates[0].map(c => [c[1], c[0]] as L.LatLngExpression);
+                    if (newCoords.length >= 3) { // A valid Leaflet polygon needs at least 3 points
+                      remainingTerritory.push(newCoords);
+                    }
+                  } else if (remainingTurf.geometry.type === 'MultiPolygon') {
+                    // Convert MultiPolygon to L.LatLngExpression[][]
+                    remainingTurf.geometry.coordinates.forEach(poly => {
+                      const newCoords = poly[0].map(c => [c[1], c[0]] as L.LatLngExpression);
+                      if (newCoords.length >= 3) {
+                        remainingTerritory.push(newCoords);
+                      }
+                    });
+                  }
+                }
               } else {
                 remainingTerritory.push(existingPolygonCoords);
               }
             } catch (e) {
-              console.error("Error processing other player's territory polygon:", e, existingPolygonCoords);
+              console.error("Error processing other player's territory polygon with turf.difference:", e, existingPolygonCoords);
               remainingTerritory.push(existingPolygonCoords); // Keep if error
             }
           } else {
