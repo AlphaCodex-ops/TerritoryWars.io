@@ -44,6 +44,8 @@ const RecenterAutomatically = ({ lat, lng }: { lat: number; lng: number }) => {
   return null;
 };
 
+const RESPAWN_DELAY_SECONDS = 10; // 10-second respawn delay
+
 const GamePage = () => {
   const { supabase, session } = useSupabase();
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -53,8 +55,10 @@ const GamePage = () => {
   const [currentPath, setCurrentPath] = useState<L.LatLngExpression[]>([]);
   const [playerTerritory, setPlayerTerritory] = useState<L.LatLngExpression[][]>([]);
   const [isPlayerAlive, setIsPlayerAlive] = useState(true);
-  const [playerScore, setPlayerScore] = useState(0); // New state for current player's score
+  const [playerScore, setPlayerScore] = useState(0);
+  const [respawnTimer, setRespawnTimer] = useState(0); // New state for respawn timer
   const watchId = useRef<number | null>(null);
+  const respawnIntervalRef = useRef<number | null>(null);
 
   // Function to stop GPS tracking
   const stopWatchingLocation = () => {
@@ -71,7 +75,7 @@ const GamePage = () => {
     const fetchPlayerProfile = async () => {
       const { data, error } = await supabase
         .from('players')
-        .select('username, territory, is_alive, score') // Fetch score
+        .select('username, territory, is_alive, score, last_killed_at') // Fetch last_killed_at
         .eq('user_id', session.user.id)
         .single();
 
@@ -83,8 +87,19 @@ const GamePage = () => {
         setUsername(data.username);
         setPlayerTerritory(data.territory || []);
         setIsPlayerAlive(data.is_alive);
-        setPlayerScore(data.score || 0); // Set player's score
+        setPlayerScore(data.score || 0);
         setIsUsernameDialogOpen(false);
+
+        // Initialize respawn timer if player is dead
+        if (!data.is_alive && data.last_killed_at) {
+          const killedTime = new Date(data.last_killed_at).getTime();
+          const currentTime = new Date().getTime();
+          const timeElapsed = (currentTime - killedTime) / 1000; // in seconds
+          const remainingTime = Math.max(0, RESPAWN_DELAY_SECONDS - timeElapsed);
+          setRespawnTimer(Math.ceil(remainingTime));
+        } else {
+          setRespawnTimer(0);
+        }
       } else {
         setIsUsernameDialogOpen(true);
       }
@@ -116,22 +131,33 @@ const GamePage = () => {
           if (payload.eventType === 'UPDATE' && newPlayer?.user_id === session.user.id) {
             setPlayerTerritory(newPlayer.territory || []);
             setIsPlayerAlive(newPlayer.is_alive);
-            setPlayerScore(newPlayer.score || 0); // Update current player's score
+            setPlayerScore(newPlayer.score || 0);
+            // Update respawn timer if player status changes
+            if (!newPlayer.is_alive && newPlayer.last_killed_at) {
+              const killedTime = new Date(newPlayer.last_killed_at).getTime();
+              const currentTime = new Date().getTime();
+              const timeElapsed = (currentTime - killedTime) / 1000;
+              const remainingTime = Math.max(0, RESPAWN_DELAY_SECONDS - timeElapsed);
+              setRespawnTimer(Math.ceil(remainingTime));
+            } else {
+              setRespawnTimer(0);
+            }
           }
           return;
         }
 
         setOtherPlayers((prevPlayers) => {
+          let updatedPlayers = [...prevPlayers];
           if (payload.eventType === 'INSERT') {
-            return [...prevPlayers, newPlayer];
+            updatedPlayers.push(newPlayer);
           } else if (payload.eventType === 'UPDATE') {
-            return prevPlayers.map((player) =>
+            updatedPlayers = updatedPlayers.map((player) =>
               player.user_id === newPlayer.user_id ? newPlayer : player
             );
           } else if (payload.eventType === 'DELETE') {
-            return prevPlayers.filter((player) => player.user_id !== oldPlayer.user_id);
+            updatedPlayers = updatedPlayers.filter((player) => player.user_id !== oldPlayer.user_id);
           }
-          return prevPlayers;
+          return updatedPlayers;
         });
       })
       .subscribe();
@@ -168,6 +194,7 @@ const GamePage = () => {
               setCurrentPath([]);
               setCurrentLocation(null); // Clear location on death
               stopWatchingLocation(); // Stop GPS tracking
+              setRespawnTimer(RESPAWN_DELAY_SECONDS); // Start respawn timer
 
               await supabase
                 .from('players')
@@ -218,6 +245,37 @@ const GamePage = () => {
       playersSubscription.unsubscribe();
     };
   }, [session, supabase, username, isPlayerAlive, otherPlayers]);
+
+  // Effect for respawn timer countdown
+  useEffect(() => {
+    if (respawnTimer > 0 && !isPlayerAlive) {
+      respawnIntervalRef.current = window.setInterval(() => {
+        setRespawnTimer((prev) => {
+          if (prev <= 1) {
+            clearInterval(respawnIntervalRef.current!);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else if (respawnTimer === 0 && !isPlayerAlive) {
+      // If timer hits 0 and player is still dead, allow respawn
+      // No action needed here, just ensures button is enabled
+    } else {
+      // Clear interval if player is alive or timer is not active
+      if (respawnIntervalRef.current) {
+        clearInterval(respawnIntervalRef.current);
+        respawnIntervalRef.current = null;
+      }
+    }
+
+    return () => {
+      if (respawnIntervalRef.current) {
+        clearInterval(respawnIntervalRef.current);
+      }
+    };
+  }, [respawnTimer, isPlayerAlive]);
+
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -272,6 +330,10 @@ const GamePage = () => {
 
   const handleRespawn = async () => {
     if (!session?.user?.id) return;
+    if (respawnTimer > 0) { // Prevent respawn if timer is still active
+      showError(`Cannot respawn yet. Please wait ${respawnTimer} seconds.`);
+      return;
+    }
 
     const { error } = await supabase
       .from('players')
@@ -296,6 +358,7 @@ const GamePage = () => {
       setPlayerTerritory([]);
       setPlayerScore(0); // Reset local score state
       setCurrentLocation(null);
+      setRespawnTimer(0); // Reset timer on successful respawn
     }
   };
 
@@ -322,14 +385,14 @@ const GamePage = () => {
         <h1 className="text-xl font-bold">Paper.io GPS Game</h1>
         <div className="flex items-center space-x-4">
           {username && <span className="text-lg">Player: {username} {isPlayerAlive ? '(Alive)' : '(Dead)'}</span>}
-          {username && <span className="text-lg">Score: {playerScore}</span>} {/* Display player's score */}
+          {username && <span className="text-lg">Score: {playerScore}</span>}
           {isPlayerAlive ? (
             <Button onClick={handleClaimTerritory} variant="secondary" disabled={currentPath.length < 3}>
               Claim Territory
             </Button>
           ) : (
-            <Button onClick={handleRespawn} variant="secondary">
-              Respawn
+            <Button onClick={handleRespawn} variant="secondary" disabled={respawnTimer > 0}>
+              {respawnTimer > 0 ? `Respawn in ${respawnTimer}s` : 'Respawn'}
             </Button>
           )}
           <Button onClick={handleLogout} variant="secondary">Logout</Button>
@@ -381,7 +444,7 @@ const GamePage = () => {
             </React.Fragment>
           ))}
         </MapContainer>
-        <Leaderboard /> {/* Add the Leaderboard component */}
+        <Leaderboard />
       </div>
       {session?.user?.id && (
         <SetUsernameDialog
