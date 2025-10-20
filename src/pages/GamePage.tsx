@@ -8,7 +8,7 @@ import { useSupabase } from '@/components/SessionContextProvider';
 import { showError, showSuccess } from '@/utils/toast';
 import { Button } from '@/components/ui/button';
 import { MadeWithDyad } from '@/components/made-with-dyad';
-import SetUsernameDialog from '@/components/SetUsernameDialog'; // Import the new component
+import SetUsernameDialog from '@/components/SetUsernameDialog';
 
 // Fix for default Leaflet icon issues with Webpack/Vite
 delete L.Icon.Default.prototype._getIconUrl;
@@ -17,6 +17,16 @@ L.Icon.Default.mergeOptions({
   iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
   shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
 });
+
+// Define a type for player data
+interface Player {
+  id: string;
+  user_id: string;
+  username: string;
+  current_lat: number;
+  current_lng: number;
+  is_alive: boolean;
+}
 
 // Component to update map view to current location
 const RecenterAutomatically = ({ lat, lng }: { lat: number; lng: number }) => {
@@ -33,7 +43,8 @@ const GamePage = () => {
   const { supabase, session } = useSupabase();
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [username, setUsername] = useState<string | null>(null);
-  const [isUsernameDialogOpen, setIsUsernameDialogOpen] = useState(false); // State for dialog
+  const [isUsernameDialogOpen, setIsUsernameDialogOpen] = useState(false);
+  const [otherPlayers, setOtherPlayers] = useState<Player[]>([]);
   const watchId = useRef<number | null>(null);
 
   useEffect(() => {
@@ -46,20 +57,60 @@ const GamePage = () => {
         .eq('user_id', session.user.id)
         .single();
 
-      if (error) {
+      if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
         showError('Failed to fetch player profile: ' + error.message);
         console.error('Error fetching player profile:', error);
-        setIsUsernameDialogOpen(true); // Open dialog if error or no profile
+        setIsUsernameDialogOpen(true);
       } else if (data && data.username) {
         setUsername(data.username);
         setIsUsernameDialogOpen(false);
       } else {
-        // If no username, prompt user to set one
         setIsUsernameDialogOpen(true);
       }
     };
 
+    const fetchOtherPlayers = async () => {
+      const { data, error } = await supabase
+        .from('players')
+        .select('*')
+        .neq('user_id', session.user.id); // Exclude current user
+
+      if (error) {
+        console.error('Error fetching other players:', error);
+      } else {
+        setOtherPlayers(data || []);
+      }
+    };
+
     fetchPlayerProfile();
+    fetchOtherPlayers();
+
+    // Set up real-time subscription for other players
+    const playersSubscription = supabase
+      .channel('public:players')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, (payload) => {
+        const newPlayer = payload.new as Player;
+        const oldPlayer = payload.old as Player;
+
+        if (newPlayer?.user_id === session.user.id || oldPlayer?.user_id === session.user.id) {
+          // Ignore changes for the current user, as their location is handled by watchPosition
+          return;
+        }
+
+        setOtherPlayers((prevPlayers) => {
+          if (payload.eventType === 'INSERT') {
+            return [...prevPlayers, newPlayer];
+          } else if (payload.eventType === 'UPDATE') {
+            return prevPlayers.map((player) =>
+              player.user_id === newPlayer.user_id ? newPlayer : player
+            );
+          } else if (payload.eventType === 'DELETE') {
+            return prevPlayers.filter((player) => player.user_id !== oldPlayer.user_id);
+          }
+          return prevPlayers;
+        });
+      })
+      .subscribe();
 
     const startWatchingLocation = () => {
       if (navigator.geolocation) {
@@ -99,14 +150,14 @@ const GamePage = () => {
       startWatchingLocation();
     }
 
-
     return () => {
       if (watchId.current !== null) {
         navigator.geolocation.clearWatch(watchId.current);
         showSuccess('GPS tracking stopped.');
       }
+      playersSubscription.unsubscribe(); // Unsubscribe from real-time updates
     };
-  }, [session, supabase, username]); // Add username to dependency array
+  }, [session, supabase, username]);
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -170,6 +221,16 @@ const GamePage = () => {
               <RecenterAutomatically lat={currentLocation.lat} lng={currentLocation.lng} />
             </>
           )}
+
+          {otherPlayers.map((player) => (
+            player.current_lat && player.current_lng && (
+              <Marker key={player.user_id} position={[player.current_lat, player.current_lng]}>
+                <Popup>
+                  Player: {player.username} <br /> Lat: {player.current_lat.toFixed(4)}, Lng: {player.current_lng.toFixed(4)}
+                </Popup>
+              </Marker>
+            )
+          ))}
         </MapContainer>
       </div>
       {session?.user?.id && (
