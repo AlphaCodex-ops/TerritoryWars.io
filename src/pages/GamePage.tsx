@@ -8,6 +8,7 @@ import { useSupabase } from '@/components/SessionContextProvider';
 import { showError, showSuccess } from '@/utils/toast';
 import { Button } from '@/components/ui/button';
 import { MadeWithDyad } from '@/components/made-with-dyad';
+import SetUsernameDialog from '@/components/SetUsernameDialog'; // Import the new component
 
 // Fix for default Leaflet icon issues with Webpack/Vite
 delete L.Icon.Default.prototype._getIconUrl;
@@ -32,6 +33,7 @@ const GamePage = () => {
   const { supabase, session } = useSupabase();
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [username, setUsername] = useState<string | null>(null);
+  const [isUsernameDialogOpen, setIsUsernameDialogOpen] = useState(false); // State for dialog
   const watchId = useRef<number | null>(null);
 
   useEffect(() => {
@@ -47,12 +49,13 @@ const GamePage = () => {
       if (error) {
         showError('Failed to fetch player profile: ' + error.message);
         console.error('Error fetching player profile:', error);
+        setIsUsernameDialogOpen(true); // Open dialog if error or no profile
       } else if (data && data.username) {
         setUsername(data.username);
+        setIsUsernameDialogOpen(false);
       } else {
         // If no username, prompt user to set one
-        showError('Please set a username to play.');
-        // TODO: Implement a UI to set username
+        setIsUsernameDialogOpen(true);
       }
     };
 
@@ -91,7 +94,11 @@ const GamePage = () => {
       }
     };
 
-    startWatchingLocation();
+    // Only start watching location if username is set
+    if (username) {
+      startWatchingLocation();
+    }
+
 
     return () => {
       if (watchId.current !== null) {
@@ -99,7 +106,7 @@ const GamePage = () => {
         showSuccess('GPS tracking stopped.');
       }
     };
-  }, [session, supabase]);
+  }, [session, supabase, username]); // Add username to dependency array
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -110,11 +117,23 @@ const GamePage = () => {
     }
   };
 
+  const handleUsernameSet = (newUsername: string) => {
+    setUsername(newUsername);
+    setIsUsernameDialogOpen(false);
+  };
+
   if (!currentLocation) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white p-4">
         <h1 className="text-3xl font-bold mb-4">Waiting for GPS location...</h1>
         <p className="text-lg text-center">Please ensure location services are enabled and grant permission.</p>
+        {session?.user?.id && (
+          <SetUsernameDialog
+            userId={session.user.id}
+            onUsernameSet={handleUsernameSet}
+            isOpen={isUsernameDialogOpen}
+          />
+        )}
         <MadeWithDyad />
       </div>
     );
@@ -153,6 +172,13 @@ const GamePage = () => {
           )}
         </MapContainer>
       </div>
+      {session?.user?.id && (
+        <SetUsernameDialog
+          userId={session.user.id}
+          onUsernameSet={handleUsernameSet}
+          isOpen={isUsernameDialogOpen}
+        />
+      )}
       <MadeWithDyad />
     </div>
   );
