@@ -9,6 +9,7 @@ import { showError, showSuccess } from '@/utils/toast';
 import { Button } from '@/components/ui/button';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import SetUsernameDialog from '@/components/SetUsernameDialog';
+import { isPointInPolygon } from '@/utils/geometry'; // Import the new utility
 
 // Fix for default Leaflet icon issues with Webpack/Vite
 delete L.Icon.Default.prototype._getIconUrl;
@@ -27,6 +28,7 @@ interface Player {
   current_lng: number;
   territory: L.LatLngExpression[][];
   is_alive: boolean;
+  last_killed_at: string | null; // Added for future use
 }
 
 // Component to update map view to current location
@@ -48,8 +50,17 @@ const GamePage = () => {
   const [otherPlayers, setOtherPlayers] = useState<Player[]>([]);
   const [currentPath, setCurrentPath] = useState<L.LatLngExpression[]>([]);
   const [playerTerritory, setPlayerTerritory] = useState<L.LatLngExpression[][]>([]);
-  const [isPlayerAlive, setIsPlayerAlive] = useState(true); // New state for player's alive status
+  const [isPlayerAlive, setIsPlayerAlive] = useState(true);
   const watchId = useRef<number | null>(null);
+
+  // Function to stop GPS tracking
+  const stopWatchingLocation = () => {
+    if (watchId.current !== null) {
+      navigator.geolocation.clearWatch(watchId.current);
+      watchId.current = null;
+      showSuccess('GPS tracking stopped.');
+    }
+  };
 
   useEffect(() => {
     if (!session) return;
@@ -57,7 +68,7 @@ const GamePage = () => {
     const fetchPlayerProfile = async () => {
       const { data, error } = await supabase
         .from('players')
-        .select('username, territory, is_alive') // Fetch is_alive status
+        .select('username, territory, is_alive')
         .eq('user_id', session.user.id)
         .single();
 
@@ -68,7 +79,7 @@ const GamePage = () => {
       } else if (data) {
         setUsername(data.username);
         setPlayerTerritory(data.territory || []);
-        setIsPlayerAlive(data.is_alive); // Set player's alive status
+        setIsPlayerAlive(data.is_alive);
         setIsUsernameDialogOpen(false);
       } else {
         setIsUsernameDialogOpen(true);
@@ -98,10 +109,9 @@ const GamePage = () => {
         const oldPlayer = payload.old as Player;
 
         if (newPlayer?.user_id === session.user.id || oldPlayer?.user_id === session.user.id) {
-          // If the change is for the current user, update their territory and alive status
           if (payload.eventType === 'UPDATE' && newPlayer?.user_id === session.user.id) {
             setPlayerTerritory(newPlayer.territory || []);
-            setIsPlayerAlive(newPlayer.is_alive); // Update current player's alive status
+            setIsPlayerAlive(newPlayer.is_alive);
           }
           return;
         }
@@ -130,13 +140,50 @@ const GamePage = () => {
             setCurrentLocation({ lat: latitude, lng: longitude });
             setCurrentPath((prevPath) => [...prevPath, newLocation]);
 
-            const { error } = await supabase
-              .from('players')
-              .update({ current_lat: latitude, current_lng: longitude, updated_at: new Date().toISOString() })
-              .eq('user_id', session.user.id);
+            // Check for collisions with other players' territories
+            const currentPlayerLatLng: L.LatLngExpression = [latitude, longitude];
+            let killedByPlayer: Player | null = null;
 
-            if (error) {
-              console.error('Error updating player location:', error);
+            for (const otherPlayer of otherPlayers) {
+              if (otherPlayer.is_alive && otherPlayer.territory && otherPlayer.territory.length > 0) {
+                for (const polygon of otherPlayer.territory) {
+                  if (isPointInPolygon(currentPlayerLatLng, polygon)) {
+                    killedByPlayer = otherPlayer;
+                    break;
+                  }
+                }
+              }
+              if (killedByPlayer) break;
+            }
+
+            if (killedByPlayer) {
+              // Player was killed
+              showError(`You were killed by ${killedByPlayer.username}!`);
+              setIsPlayerAlive(false);
+              setCurrentPath([]);
+              setCurrentLocation(null); // Clear location on death
+              stopWatchingLocation(); // Stop GPS tracking
+
+              await supabase
+                .from('players')
+                .update({
+                  is_alive: false,
+                  current_lat: null,
+                  current_lng: null,
+                  last_killed_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('user_id', session.user.id);
+            } else {
+              // No collision, update player's location in Supabase
+              const { error } = await supabase
+                .from('players')
+                .update({ current_lat: latitude, current_lng: longitude, updated_at: new Date().toISOString() })
+                .eq('user_id', session.user.id);
+
+              if (error) {
+                console.error('Error updating player location:', error);
+              }
             }
           },
           (error) => {
@@ -155,24 +202,17 @@ const GamePage = () => {
       }
     };
 
-    // Only start watching location if username is set AND player is alive
     if (username && isPlayerAlive) {
       startWatchingLocation();
-    } else if (watchId.current !== null) {
-      // If player is not alive or username not set, stop watching location
-      navigator.geolocation.clearWatch(watchId.current);
-      watchId.current = null;
-      showSuccess('GPS tracking stopped.');
+    } else if (!isPlayerAlive) {
+      stopWatchingLocation(); // Ensure GPS is stopped if player is not alive
     }
 
     return () => {
-      if (watchId.current !== null) {
-        navigator.geolocation.clearWatch(watchId.current);
-        showSuccess('GPS tracking stopped.');
-      }
+      stopWatchingLocation(); // Cleanup on unmount or dependency change
       playersSubscription.unsubscribe();
     };
-  }, [session, supabase, username, isPlayerAlive]); // Add isPlayerAlive to dependency array
+  }, [session, supabase, username, isPlayerAlive, otherPlayers]); // Added otherPlayers to dependencies for collision check
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -220,7 +260,14 @@ const GamePage = () => {
 
     const { error } = await supabase
       .from('players')
-      .update({ is_alive: true, current_lat: null, current_lng: null, territory: [], updated_at: new Date().toISOString() })
+      .update({
+        is_alive: true,
+        current_lat: null,
+        current_lng: null,
+        territory: [],
+        last_killed_at: null, // Clear last_killed_at on respawn
+        updated_at: new Date().toISOString(),
+      })
       .eq('user_id', session.user.id);
 
     if (error) {
@@ -229,9 +276,9 @@ const GamePage = () => {
     } else {
       showSuccess('Respawned successfully!');
       setIsPlayerAlive(true);
-      setCurrentPath([]); // Clear path on respawn
-      setPlayerTerritory([]); // Clear territory on respawn
-      setCurrentLocation(null); // Reset location to trigger re-centering
+      setCurrentPath([]);
+      setPlayerTerritory([]);
+      setCurrentLocation(null);
     }
   };
 
@@ -272,7 +319,7 @@ const GamePage = () => {
       </header>
       <div className="flex-grow relative">
         <MapContainer
-          center={[currentLocation?.lat || 0, currentLocation?.lng || 0]} // Use default if currentLocation is null
+          center={[currentLocation?.lat || 0, currentLocation?.lng || 0]}
           zoom={18}
           scrollWheelZoom={true}
           className="h-full w-full"
@@ -282,7 +329,7 @@ const GamePage = () => {
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          {currentLocation && isPlayerAlive && ( // Only show marker if alive
+          {currentLocation && isPlayerAlive && (
             <>
               <Marker position={[currentLocation.lat, currentLocation.lng]}>
                 <Popup>
@@ -293,17 +340,14 @@ const GamePage = () => {
             </>
           )}
 
-          {/* Render current player's claimed territory */}
           {playerTerritory.map((polygon, index) => (
             <Polygon key={`player-territory-${index}`} positions={polygon} pathOptions={{ color: 'blue', fillColor: 'lightblue', fillOpacity: 0.5 }} />
           ))}
 
-          {/* Render current player's path only if alive */}
           {isPlayerAlive && currentPath.length > 1 && (
             <Polyline positions={currentPath} pathOptions={{ color: 'blue', weight: 5 }} />
           )}
 
-          {/* Render other players' markers and territories, only if they are alive */}
           {otherPlayers.filter(p => p.is_alive).map((player) => (
             <React.Fragment key={player.user_id}>
               {player.current_lat && player.current_lng && (
