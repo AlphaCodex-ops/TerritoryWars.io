@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef, useCallback } from 'react'; // Added useCallback
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline, Polygon } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -32,6 +32,7 @@ interface Player {
   is_alive: boolean;
   last_killed_at: string | null;
   score: number;
+  current_path: L.LatLngExpression[]; // Added current_path
 }
 
 // Component to update map view to current location
@@ -87,6 +88,7 @@ const GamePage = () => {
         current_lat: null,
         current_lng: null,
         last_killed_at: new Date().toISOString(),
+        current_path: [], // Clear current path on death
         updated_at: new Date().toISOString(),
       })
       .eq('user_id', session.user.id);
@@ -98,7 +100,7 @@ const GamePage = () => {
     const fetchPlayerProfile = async () => {
       const { data, error } = await supabase
         .from('players')
-        .select('username, territory, is_alive, score, last_killed_at')
+        .select('username, territory, is_alive, score, last_killed_at, current_path') // Select current_path
         .eq('user_id', session.user.id)
         .single();
 
@@ -111,6 +113,7 @@ const GamePage = () => {
         setPlayerTerritory(data.territory || []);
         setIsPlayerAlive(data.is_alive);
         setPlayerScore(data.score || 0);
+        setCurrentPath(data.current_path || []); // Set current path from DB
         setIsUsernameDialogOpen(false);
 
         if (!data.is_alive && data.last_killed_at) {
@@ -154,6 +157,7 @@ const GamePage = () => {
             setPlayerTerritory(newPlayer.territory || []);
             setIsPlayerAlive(newPlayer.is_alive);
             setPlayerScore(newPlayer.score || 0);
+            setCurrentPath(newPlayer.current_path || []); // Update current player's path from DB
             if (!newPlayer.is_alive && newPlayer.last_killed_at) {
               const killedTime = new Date(newPlayer.last_killed_at).getTime();
               const currentTime = new Date().getTime();
@@ -191,7 +195,7 @@ const GamePage = () => {
             const newLocation: L.LatLngExpression = [latitude, longitude];
             setCurrentLocation({ lat: latitude, lng: longitude });
 
-            setCurrentPath((prevPath) => {
+            setCurrentPath(async (prevPath) => { // Made this async to allow DB updates
               const updatedPath = [...prevPath, newLocation];
 
               // 1. Check for self-intersection of the current path
@@ -252,39 +256,82 @@ const GamePage = () => {
                   }
                 }
               }
-              return updatedPath;
-            });
 
+              // 3. Check for collisions with other players' territories (existing logic)
+              const currentPlayerLatLng: L.LatLngExpression = [latitude, longitude];
+              let killedByPlayer: Player | null = null;
 
-            // 3. Check for collisions with other players' territories (existing logic)
-            const currentPlayerLatLng: L.LatLngExpression = [latitude, longitude];
-            let killedByPlayer: Player | null = null;
+              for (const otherPlayer of otherPlayers) {
+                if (otherPlayer.is_alive && otherPlayer.territory && otherPlayer.territory.length > 0) {
+                  for (const polygon of otherPlayer.territory) {
+                    if (isPointInPolygon(currentPlayerLatLng, polygon)) {
+                      killedByPlayer = otherPlayer;
+                      break;
+                    }
+                  }
+                }
+                if (killedByPlayer) break;
+              }
 
-            for (const otherPlayer of otherPlayers) {
-              if (otherPlayer.is_alive && otherPlayer.territory && otherPlayer.territory.length > 0) {
-                for (const polygon of otherPlayer.territory) {
-                  if (isPointInPolygon(currentPlayerLatLng, polygon)) {
-                    killedByPlayer = otherPlayer;
-                    break;
+              if (killedByPlayer) {
+                handlePlayerDeath(`You were killed by ${killedByPlayer.username}!`);
+                return []; // Clear path on death
+              }
+
+              // 4. Check for killing other players by crossing their path
+              if (updatedPath.length >= 2) {
+                const currentPlayerPathTurf = turf.lineString(updatedPath.map(coord => {
+                  const lat = typeof coord[0] === 'number' ? coord[0] : coord.lat;
+                  const lng = typeof coord[1] === 'number' ? coord[1] : coord.lng;
+                  return [lng, lat];
+                }));
+
+                for (const otherPlayer of otherPlayers) {
+                  if (otherPlayer.is_alive && otherPlayer.current_path && otherPlayer.current_path.length >= 2) {
+                    const otherPlayerPathTurf = turf.lineString(otherPlayer.current_path.map(coord => {
+                      const lat = typeof coord[0] === 'number' ? coord[0] : coord.lat;
+                      const lng = typeof coord[1] === 'number' ? coord[1] : coord.lng;
+                      return [lng, lat];
+                    }));
+
+                    if (turf.lineIntersect(currentPlayerPathTurf, otherPlayerPathTurf).features.length > 0) {
+                      // Kill the other player
+                      showSuccess(`You killed ${otherPlayer.username} by crossing their path!`);
+                      await supabase
+                        .from('players')
+                        .update({
+                          is_alive: false,
+                          current_lat: null,
+                          current_lng: null,
+                          last_killed_at: new Date().toISOString(),
+                          current_path: [], // Clear other player's path on death
+                          updated_at: new Date().toISOString(),
+                        })
+                        .eq('user_id', otherPlayer.user_id);
+                      // No need to return [] here, as it's the current player's path.
+                      // The other player's state will be updated via subscription.
+                    }
                   }
                 }
               }
-              if (killedByPlayer) break;
-            }
 
-            if (killedByPlayer) {
-              handlePlayerDeath(`You were killed by ${killedByPlayer.username}!`);
-            } else {
-              // No collision, update player's location in Supabase
+              // If no death, update current player's location and path in Supabase
               const { error } = await supabase
                 .from('players')
-                .update({ current_lat: latitude, current_lng: longitude, updated_at: new Date().toISOString() })
+                .update({
+                  current_lat: latitude,
+                  current_lng: longitude,
+                  current_path: updatedPath, // Update current path in DB
+                  updated_at: new Date().toISOString()
+                })
                 .eq('user_id', session.user.id);
 
               if (error) {
-                console.error('Error updating player location:', error);
+                console.error('Error updating player location or path:', error);
               }
-            }
+
+              return updatedPath;
+            });
           },
           (error) => {
             showError('Error getting location: ' + error.message);
@@ -312,7 +359,7 @@ const GamePage = () => {
       stopWatchingLocation();
       playersSubscription.unsubscribe();
     };
-  }, [session, supabase, username, isPlayerAlive, otherPlayers, handlePlayerDeath, playerTerritory]); // Added playerTerritory to dependencies
+  }, [session, supabase, username, isPlayerAlive, otherPlayers, handlePlayerDeath, playerTerritory]);
 
   useEffect(() => {
     if (respawnTimer > 0 && !isPlayerAlive) {
@@ -496,7 +543,12 @@ const GamePage = () => {
 
     const { error } = await supabase
       .from('players')
-      .update({ territory: newTerritory, score: newScore, updated_at: new Date().toISOString() })
+      .update({
+        territory: newTerritory,
+        score: newScore,
+        current_path: [], // Clear current path after claiming territory
+        updated_at: new Date().toISOString()
+      })
       .eq('user_id', session?.user?.id);
 
     if (error) {
@@ -526,6 +578,7 @@ const GamePage = () => {
         territory: [],
         last_killed_at: null,
         score: 0,
+        current_path: [], // Clear current path on respawn
         updated_at: new Date().toISOString(),
       })
       .eq('user_id', session.user.id);
@@ -623,6 +676,9 @@ const GamePage = () => {
               {player.territory && player.territory.map((polygon, index) => (
                 <Polygon key={`other-player-${player.user_id}-territory-${index}`} positions={polygon} pathOptions={{ color: 'red', fillColor: 'pink', fillOpacity: 0.3 }} />
               ))}
+              {player.current_path && player.current_path.length > 1 && (
+                <Polyline positions={player.current_path} pathOptions={{ color: 'red', weight: 5, dashArray: '10, 10' }} />
+              )}
             </React.Fragment>
           ))}
         </MapContainer>
