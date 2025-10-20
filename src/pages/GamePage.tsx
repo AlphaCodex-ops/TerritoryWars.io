@@ -89,6 +89,8 @@ const GamePage = () => {
         current_lng: null,
         last_killed_at: new Date().toISOString(),
         current_path: [], // Clear current path on death
+        territory: [], // Clear territory on death
+        score: 0, // Reset score on death
         updated_at: new Date().toISOString(),
       })
       .eq('user_id', session.user.id);
@@ -305,6 +307,8 @@ const GamePage = () => {
                           current_lng: null,
                           last_killed_at: new Date().toISOString(),
                           current_path: [], // Clear other player's path on death
+                          territory: [], // Clear other player's territory on death
+                          score: 0, // Reset other player's score on death
                           updated_at: new Date().toISOString(),
                         })
                         .eq('user_id', otherPlayer.user_id);
