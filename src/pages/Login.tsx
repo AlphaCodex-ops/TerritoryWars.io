@@ -1,5 +1,6 @@
 "use client";
 
+import React from 'react'; // Added React import
 import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { useSupabase } from '@/components/SessionContextProvider';
