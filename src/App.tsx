@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import GamePage from "./pages/GamePage";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
+import HomePage from "./pages/HomePage"; // Import the new HomePage
 import { SessionContextProvider, useSupabase } from "./components/SessionContextProvider";
 import React from "react";
 
@@ -33,8 +34,9 @@ const AppContent = () => {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={session ? <Navigate to="/" replace /> : <Login />} />
-        <Route path="/" element={<PrivateRoute><GamePage /></PrivateRoute>} />
+        <Route path="/" element={<HomePage />} /> {/* Home page at root */}
+        <Route path="/login" element={session ? <Navigate to="/game" replace /> : <Login />} /> {/* Redirect to /game after login */}
+        <Route path="/game" element={<PrivateRoute><GamePage /></PrivateRoute>} /> {/* Game page is now protected at /game */}
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<NotFound />} />
       </Routes>

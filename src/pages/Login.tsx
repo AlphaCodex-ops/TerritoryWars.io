@@ -27,7 +27,7 @@ const Login = () => {
             },
           }}
           theme="light" // Or "dark" based on your app's theme
-          redirectTo={window.location.origin + '/'}
+          redirectTo={window.location.origin + '/game'} {/* Redirect to /game */}
         />
       </div>
     </div>
