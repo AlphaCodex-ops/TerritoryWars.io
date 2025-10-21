@@ -16,6 +16,6 @@ export default defineConfig(() => ({
     },
   },
   optimizeDeps: {
-    include: ['react', 'react-dom/client'],
+    include: ['react', 'react-dom', 'react-dom/client'], // Added 'react-dom' here
   },
 }));
