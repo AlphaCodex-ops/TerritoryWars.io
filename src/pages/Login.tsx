@@ -1,13 +1,12 @@
 "use client";
 
-import React from 'react'; // Added React import
+import React from 'react';
 import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { useSupabase } from '@/components/SessionContextProvider';
-// Removed useNavigate and useEffect as redirection is now handled in App.tsx
 
 const Login = () => {
-  const { supabase } = useSupabase(); // Removed session as it's not needed for redirection here
+  const { supabase } = useSupabase();
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
@@ -15,7 +14,7 @@ const Login = () => {
         <h2 className="text-2xl font-bold text-center mb-6 text-gray-900 dark:text-white">Sign In / Sign Up</h2>
         <Auth
           supabaseClient={supabase}
-          providers={[]} // You can add 'google', 'github', etc. here if desired
+          providers={[]}
           appearance={{
             theme: ThemeSupa,
             variables: {
@@ -27,8 +26,8 @@ const Login = () => {
               },
             },
           }}
-          theme="light" // Or "dark" based on your app's theme
-          redirectTo={window.location.origin + '/game'} {/* Redirect to /game */}
+          theme="light"
+          redirectTo={window.location.origin + '/game'}
         />
       </div>
     </div>
