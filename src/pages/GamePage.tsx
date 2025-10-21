@@ -5,7 +5,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline, Polygon } fro
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { useSupabase } from '@/components/SessionContextProvider';
-import { showError, showSuccess } => '@/utils/toast';
+import { showError, showSuccess } from '@/utils/toast';
 import { Button } from '@/components/ui/button';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import SetUsernameDialog from '@/components/SetUsernameDialog';
@@ -47,6 +47,7 @@ const RecenterAutomatically = ({ lat, lng }: { lat: number; lng: number }) => {
 };
 
 const RESPAWN_DELAY_SECONDS = 10; // 10-second respawn delay
+const MIN_CLAIM_AREA_SQ_METERS = 100; // Minimum area in square meters for a valid territory claim
 
 // Helper function to convert Turf.js Polygon/MultiPolygon Feature to L.LatLngExpression[][]
 const turfFeatureToLatLngExpression = (feature: turf.Feature<turf.Polygon | turf.MultiPolygon> | null): L.LatLngExpression[][] => {
@@ -482,6 +483,12 @@ const GamePage = () => {
       }
     } else {
       showError('Path is too short to form a valid polygon.');
+      return;
+    }
+
+    // Check if the newly claimed area is significant enough
+    if (newlyClaimedTurfPolygon && turf.area(newlyClaimedTurfPolygon) < MIN_CLAIM_AREA_SQ_METERS) {
+      showError(`Claimed area is too small. Minimum required area is ${MIN_CLAIM_AREA_SQ_METERS} sq meters.`);
       return;
     }
 
