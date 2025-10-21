@@ -12,6 +12,7 @@ import SetUsernameDialog from '@/components/SetUsernameDialog';
 import { isPointInPolygon } from '@/utils/geometry';
 import Leaderboard from '@/components/Leaderboard';
 import * as turf from '@turf/turf';
+import { turfFeatureToLatLngExpression, calculateScore } from '@/utils/territoryUtils'; // Import from new utility file
 
 // Fix for default Leaflet icon issues with Webpack/Vite
 delete L.Icon.Default.prototype._getIconUrl;
@@ -48,22 +49,6 @@ const RecenterAutomatically = ({ lat, lng }: { lat: number; lng: number }) => {
 
 const RESPAWN_DELAY_SECONDS = 10; // 10-second respawn delay
 const MIN_CLAIM_AREA_SQ_METERS = 100; // Minimum area in square meters for a valid territory claim
-
-// Helper function to convert Turf.js Polygon/MultiPolygon Feature to L.LatLngExpression[][]
-const turfFeatureToLatLngExpression = (feature: turf.Feature<turf.Polygon | turf.MultiPolygon> | null): L.LatLngExpression[][] => {
-  if (!feature) return [];
-  const result: L.LatLngExpression[][] = [];
-  if (feature.geometry.type === 'Polygon') {
-    const coords = feature.geometry.coordinates[0].map(c => [c[1], c[0]] as L.LatLngExpression);
-    if (coords.length >= 3) result.push(coords);
-  } else if (feature.geometry.type === 'MultiPolygon') {
-    feature.geometry.coordinates.forEach(poly => {
-      const coords = poly[0].map(c => [c[1], c[0]] as L.LatLngExpression);
-      if (coords.length >= 3) result.push(coords);
-    });
-  }
-  return result;
-};
 
 const GamePage = () => {
   const { supabase, session } = useSupabase();
@@ -196,7 +181,7 @@ const GamePage = () => {
             updatedPlayers.push(newPlayer);
           } else if (payload.eventType === 'UPDATE') {
             updatedPlayers = updatedPlayers.map((player) =>
-              player.user_id === newPlayer.user_id ? newPlayer : player
+              player.user_id === newPlayer.user.id ? newPlayer : player
             );
           } else if (payload.eventType === 'DELETE') {
             updatedPlayers = updatedPlayers.filter((player) => player.user_id !== oldPlayer.user_id);
@@ -422,33 +407,6 @@ const GamePage = () => {
   const handleUsernameSet = (newUsername: string) => {
     setUsername(newUsername);
     setIsUsernameDialogOpen(false);
-  };
-
-  // Calculate score based on the area of all claimed polygons
-  const calculateScore = (territory: L.LatLngExpression[][]): number => {
-    let totalArea = 0;
-    territory.forEach(polygonCoords => {
-      const geoJsonCoords = polygonCoords.map(coord => {
-        const lat = typeof coord[0] === 'number' ? coord[0] : coord.lat;
-        const lng = typeof coord[1] === 'number' ? coord[1] : coord.lng;
-        return [lng, lat]; // Turf expects [longitude, latitude]
-      });
-
-      // Ensure the polygon is closed
-      if (geoJsonCoords.length > 0 && (geoJsonCoords[0][0] !== geoJsonCoords[geoJsonCoords.length - 1][0] || geoJsonCoords[0][1] !== geoJsonCoords[geoJsonCoords.length - 1][1])) {
-        geoJsonCoords.push(geoJsonCoords[0]);
-      }
-
-      if (geoJsonCoords.length >= 4) { // A valid polygon needs at least 3 unique points + closing point
-        try {
-          const polygon = turf.polygon([geoJsonCoords]);
-          totalArea += turf.area(polygon); // area in square meters
-        } catch (e) {
-          console.error("Error calculating area for polygon:", e, polygonCoords);
-        }
-      }
-    });
-    return Math.round(totalArea / 1000); // Return area in thousands of square meters for a more manageable score
   };
 
   const handleClaimTerritory = async () => {
