@@ -90,23 +90,6 @@ const GamePage = () => {
     }
   };
 
-  if (!currentLocation && isPlayerAlive) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white p-4">
-        <h1 className="text-3xl font-bold mb-4">Waiting for GPS location...</h1>
-        <p className="text-lg text-center">Please ensure location services are enabled and grant permission.</p>
-        {session?.user?.id && (
-          <SetUsernameDialog
-            userId={session.user.id}
-            onUsernameSet={handleUsernameSet}
-            isOpen={isUsernameDialogOpen}
-          />
-        )}
-        <MadeWithDyad />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen flex flex-col">
       <header className="bg-primary text-primary-foreground p-4 flex justify-between items-center shadow-md">
@@ -126,55 +109,63 @@ const GamePage = () => {
           <Button onClick={handleLogout} variant="secondary">Logout</Button>
         </div>
       </header>
+
       <div className="flex-grow relative">
-        <MapContainer
-          center={[currentLocation?.lat || 0, currentLocation?.lng || 0]}
-          zoom={18}
-          scrollWheelZoom={true}
-          className="h-full w-full"
-          style={{ height: '100vh', width: '100%' }}
-        >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          {currentLocation && isPlayerAlive && (
-            <>
-              <Marker position={[currentLocation.lat, currentLocation.lng]}>
-                <Popup>
-                  You are here! <br /> Lat: {currentLocation.lat.toFixed(4)}, Lng: {currentLocation.lng.toFixed(4)}
-                </Popup>
-              </Marker>
-              <RecenterAutomatically lat={currentLocation.lat} lng={currentLocation.lng} />
-            </>
-          )}
-
-          {playerTerritory.map((polygon, index) => (
-            <Polygon key={`player-territory-${index}`} positions={polygon} pathOptions={{ color: 'blue', fillColor: 'lightblue', fillOpacity: 0.5 }} />
-          ))}
-
-          {isPlayerAlive && currentPath.length > 1 && (
-            <Polyline positions={currentPath} pathOptions={{ color: 'blue', weight: 5 }} />
-          )}
-
-          {otherPlayers.filter(p => p.is_alive).map((player) => (
-            <React.Fragment key={player.user_id}>
-              {player.current_lat && player.current_lng && (
-                <Marker position={[player.current_lat, player.current_lng]}>
+        {!currentLocation && isPlayerAlive ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white p-4 z-[1001]">
+            <h1 className="text-3xl font-bold mb-4">Waiting for GPS location...</h1>
+            <p className="text-lg text-center">Please ensure location services are enabled and grant permission.</p>
+          </div>
+        ) : (
+          <MapContainer
+            center={[currentLocation?.lat || 0, currentLocation?.lng || 0]}
+            zoom={18}
+            scrollWheelZoom={true}
+            className="h-full w-full"
+            style={{ height: '100vh', width: '100%' }}
+          >
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+            {currentLocation && isPlayerAlive && (
+              <>
+                <Marker position={[currentLocation.lat, currentLocation.lng]}>
                   <Popup>
-                    Player: {player.username} <br /> Lat: {player.current_lat.toFixed(4)}, Lng: {player.current_lng.toFixed(4)}
+                    You are here! <br /> Lat: {currentLocation.lat.toFixed(4)}, Lng: {currentLocation.lng.toFixed(4)}
                   </Popup>
                 </Marker>
-              )}
-              {player.territory && player.territory.map((polygon, index) => (
-                <Polygon key={`other-player-${player.user_id}-territory-${index}`} positions={polygon} pathOptions={{ color: 'red', fillColor: 'pink', fillOpacity: 0.3 }} />
-              ))}
-              {player.current_path && player.current_path.length > 1 && (
-                <Polyline positions={player.current_path} pathOptions={{ color: 'red', weight: 5, dashArray: '10, 10' }} />
-              )}
-            </React.Fragment>
-          ))}
-        </MapContainer>
+                <RecenterAutomatically lat={currentLocation.lat} lng={currentLocation.lng} />
+              </>
+            )}
+
+            {playerTerritory.map((polygon, index) => (
+              <Polygon key={`player-territory-${index}`} positions={polygon} pathOptions={{ color: 'blue', fillColor: 'lightblue', fillOpacity: 0.5 }} />
+            ))}
+
+            {isPlayerAlive && currentPath.length > 1 && (
+              <Polyline positions={currentPath} pathOptions={{ color: 'blue', weight: 5 }} />
+            )}
+
+            {otherPlayers.filter(p => p.is_alive).map((player) => (
+              <React.Fragment key={player.user_id}>
+                {player.current_lat && player.current_lng && (
+                  <Marker position={[player.current_lat, player.current_lng]}>
+                    <Popup>
+                      Player: {player.username} <br /> Lat: {player.current_lat.toFixed(4)}, Lng: {player.current_lng.toFixed(4)}
+                    </Popup>
+                  </Marker>
+                )}
+                {player.territory && player.territory.map((polygon, index) => (
+                  <Polygon key={`other-player-${player.user_id}-territory-${index}`} positions={polygon} pathOptions={{ color: 'red', fillColor: 'pink', fillOpacity: 0.3 }} />
+                ))}
+                {player.current_path && player.current_path.length > 1 && (
+                  <Polyline positions={player.current_path} pathOptions={{ color: 'red', weight: 5, dashArray: '10, 10' }} />
+                )}
+              </React.Fragment>
+            ))}
+          </MapContainer>
+        )}
         <Leaderboard />
       </div>
       {session?.user?.id && (
