@@ -25,6 +25,8 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
 });
 
+const DEFAULT_MAP_CENTER: L.LatLngExpression = [51.505, -0.09]; // Example: London
+
 const GamePage = () => {
   const { supabase, session } = useSupabase();
   const [showChangeUsernameDialog, setShowChangeUsernameDialog] = useState(false);
@@ -126,7 +128,7 @@ const GamePage = () => {
           </div>
         ) : (
           <MapContainer
-            center={[currentLocation?.lat || 0, currentLocation?.lng || 0]}
+            center={currentLocation ? [currentLocation.lat, currentLocation.lng] : DEFAULT_MAP_CENTER}
             zoom={18}
             scrollWheelZoom={true}
             className="h-full w-full"
