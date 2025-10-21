@@ -12,7 +12,7 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "jsx": "react-jsxdev", // Use react-jsxdev for development
+    "jsx": "react-jsx", // Crucial for React 18's new JSX transform
 
     /* Linting */
     "strict": true,
@@ -21,11 +21,11 @@
     "noFallthroughCasesInSwitch": true,
 
     /* Path Aliases */
-    "baseUrl": "./",
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["./src/*"]
     }
   },
-  "include": ["src", "vite.config.ts"],
+  "include": ["src", "vite.config.ts", "postcss.config.js", "tailwind.config.ts", "eslint.config.js", "components.json"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
