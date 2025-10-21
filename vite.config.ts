@@ -11,9 +11,9 @@ export default defineConfig(() => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      // Explicitly alias react and react-dom to ensure a single instance
+      // Explicitly alias react to ensure a single instance
       "react": path.resolve(__dirname, "node_modules/react"),
-      "react-dom": path.resolve(__dirname, "node_modules/react-dom/client"), // Point directly to client entry
+      // Removed the problematic "react-dom" alias
     },
   },
 }));
