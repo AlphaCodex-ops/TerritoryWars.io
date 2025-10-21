@@ -11,8 +11,9 @@ export default defineConfig(() => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      // Removed explicit aliases for 'react' and 'react-dom/client'
-      // to allow default module resolution to take effect.
     },
+  },
+  optimizeDeps: {
+    include: ['react', 'react-dom/client'], // Explicitly include for optimization
   },
 }));
