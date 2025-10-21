@@ -1,5 +1,5 @@
-import * as ReactDOMClient from "react-dom/client"; // Changed import style
+import ReactDOM from "react-dom/client";
 import App from "./App.tsx";
 import "./globals.css";
 
-ReactDOMClient.createRoot(document.getElementById("root")!).render(<App />); // Using the namespace object
+ReactDOM.createRoot(document.getElementById("root")!).render(<App />);
