@@ -53,7 +53,7 @@ const GamePage = () => {
   } = useGameData({ supabase, session });
 
   // Use the custom hook for game logic (GPS tracking, collision detection)
-  const { currentLocation, setCurrentLocation, stopWatchingLocation, handlePlayerDeath } = useGameLogic({
+  const { currentLocation, setCurrentLocation, stopWatchingLocation, startWatchingLocation, handlePlayerDeath, isGpsActive } = useGameLogic({
     session,
     supabase,
     username,
@@ -95,6 +95,14 @@ const GamePage = () => {
     }
   };
 
+  const toggleGpsTracking = () => {
+    if (isGpsActive) {
+      stopWatchingLocation();
+    } else {
+      startWatchingLocation();
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
       <header className="bg-primary text-primary-foreground p-4 flex justify-between items-center shadow-md">
@@ -103,12 +111,17 @@ const GamePage = () => {
           {username && <span className="text-lg">Player: {username} {isPlayerAlive ? '(Alive)' : '(Dead)'}</span>}
           {username && <span className="text-lg">Score: {playerScore}</span>}
           {isPlayerAlive ? (
-            <Button onClick={handleClaimTerritory} variant="secondary" disabled={currentPath.length < 3 || isClaiming}>
+            <Button onClick={handleClaimTerritory} variant="secondary" disabled={currentPath.length < 3 || isClaiming || !isGpsActive}>
               {isClaiming ? 'Claiming...' : 'Claim Territory'}
             </Button>
           ) : (
             <Button onClick={handleRespawn} variant="secondary" disabled={respawnTimer > 0 || isRespawning}>
               {isRespawning ? 'Respawning...' : (respawnTimer > 0 ? `Respawn in ${respawnTimer}s` : 'Respawn')}
+            </Button>
+          )}
+          {username && (
+            <Button onClick={toggleGpsTracking} variant="outline">
+              {isGpsActive ? 'Stop GPS' : 'Start GPS'}
             </Button>
           )}
           {username && (
@@ -121,7 +134,7 @@ const GamePage = () => {
       </header>
 
       <div className="flex-grow relative">
-        {!currentLocation && isPlayerAlive ? (
+        {!currentLocation && isPlayerAlive && isGpsActive ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white p-4 z-[1001]">
             <h1 className="text-3xl font-bold mb-4">Waiting for GPS location...</h1>
             <p className="text-lg text-center">Please ensure location services are enabled and grant permission.</p>
