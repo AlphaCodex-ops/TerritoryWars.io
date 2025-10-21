@@ -14,7 +14,8 @@ import { useGameLogic } from '@/hooks/useGameLogic';
 import { useGameData } from '@/hooks/useGameData';
 import { useGameActions } from '@/hooks/useGameActions';
 import RecenterAutomatically from '@/components/map/RecenterAutomatically';
-import GpsStatusIndicator from '@/components/map/GpsStatusIndicator'; // Import the new component
+import GpsStatusIndicator from '@/components/map/GpsStatusIndicator';
+import PathStartMarker from '@/components/map/PathStartMarker'; // New import
 import { Player } from '@/types/game';
 import RespawnOverlay from '@/components/RespawnOverlay';
 
@@ -168,7 +169,10 @@ const GamePage = () => {
             ))}
 
             {isPlayerAlive && currentPath.length > 1 && (
-              <Polyline positions={currentPath} pathOptions={{ color: 'blue', weight: 5 }} />
+              <>
+                <Polyline positions={currentPath} pathOptions={{ color: 'blue', weight: 5 }} />
+                <PathStartMarker position={currentPath[0]} /> {/* Render PathStartMarker */}
+              </>
             )}
 
             {otherPlayers.filter(p => p.is_alive).map((player) => (

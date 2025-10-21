@@ -99,3 +99,9 @@
     @apply bg-background text-foreground;
   }
 }
+
+.custom-path-start-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
