@@ -14,8 +14,9 @@ import { useGameLogic } from '@/hooks/useGameLogic';
 import { useGameData } from '@/hooks/useGameData';
 import { useGameActions } from '@/hooks/useGameActions';
 import RecenterAutomatically from '@/components/map/RecenterAutomatically';
+import GpsStatusIndicator from '@/components/map/GpsStatusIndicator'; // Import the new component
 import { Player } from '@/types/game';
-import RespawnOverlay from '@/components/RespawnOverlay'; // Import the new component
+import RespawnOverlay from '@/components/RespawnOverlay';
 
 // Fix for default Leaflet icon issues with Webpack/Vite
 delete L.Icon.Default.prototype._getIconUrl;
@@ -187,6 +188,7 @@ const GamePage = () => {
                 )}
               </React.Fragment>
             ))}
+            <GpsStatusIndicator isGpsActive={isGpsActive} />
           </MapContainer>
         )}
         <Leaderboard />
