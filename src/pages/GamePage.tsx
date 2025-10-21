@@ -115,13 +115,6 @@ const GamePage = () => {
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white p-4 z-[1001]">
             <h1 className="text-3xl font-bold mb-4">Waiting for GPS location...</h1>
             <p className="text-lg text-center">Please ensure location services are enabled and grant permission.</p>
-            {session?.user?.id && (
-              <SetUsernameDialog
-                userId={session.user.id}
-                onUsernameSet={handleUsernameSet}
-                isOpen={isUsernameDialogOpen}
-              />
-            )}
           </div>
         ) : (
           <MapContainer
@@ -175,7 +168,7 @@ const GamePage = () => {
         )}
         <Leaderboard />
       </div>
-      {session?.user?.id && isUsernameDialogOpen && currentLocation && (
+      {session?.user?.id && isUsernameDialogOpen && (
         <SetUsernameDialog
           userId={session.user.id}
           onUsernameSet={handleUsernameSet}
