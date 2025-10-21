@@ -1,3 +1,4 @@
+import React from "react"; // Explicitly import React
 import ReactDOM from "react-dom/client";
 import App from "./App.tsx";
 import "./globals.css";
