@@ -75,6 +75,11 @@ export const useGameLogic = ({
             setCurrentPath(async (prevPath) => {
               const updatedPath = [...prevPath, newLocation];
 
+              // Early exit if player is not alive
+              if (!isPlayerAlive) {
+                return [];
+              }
+
               // 1. Check for self-intersection of the current path
               if (updatedPath.length >= 3) {
                 const newSegmentStart = updatedPath[updatedPath.length - 2];
@@ -101,14 +106,15 @@ export const useGameLogic = ({
                 }
               }
 
-              // 2. Check for intersection with own claimed territory
-              if (updatedPath.length >= 2 && playerTerritory.length > 0) {
-                const currentPathTurf = turf.lineString(updatedPath.map(coord => {
-                  const lat = typeof coord[0] === 'number' ? coord[0] : coord.lat;
-                  const lng = typeof coord[1] === 'number' ? coord[1] : coord.lng;
-                  return [lng, lat];
-                }));
+              // Convert current path to Turf.js LineString for multiple checks
+              const currentPathTurf = updatedPath.length >= 2 ? turf.lineString(updatedPath.map(coord => {
+                const lat = typeof coord[0] === 'number' ? coord[0] : coord.lat;
+                const lng = typeof coord[1] === 'number' ? coord[1] : coord.lng;
+                return [lng, lat];
+              })) : null;
 
+              // 2. Check for intersection with own claimed territory
+              if (currentPathTurf && playerTerritory.length > 0) {
                 for (const polygonCoords of playerTerritory) {
                   const ownTerritoryTurfCoords = polygonCoords.map(coord => {
                     const lat = typeof coord[0] === 'number' ? coord[0] : coord.lat;
@@ -132,35 +138,65 @@ export const useGameLogic = ({
                 }
               }
 
-              // 3. Check for collisions with other players' territories
+              // 3. Check for collisions with other players' territories (current location inside)
               const currentPlayerLatLng: L.LatLngExpression = [latitude, longitude];
-              let killedByPlayer: Player | null = null;
+              let killedByPlayerTerritory: Player | null = null;
 
               for (const otherPlayer of otherPlayers) {
                 if (otherPlayer.is_alive && otherPlayer.territory && otherPlayer.territory.length > 0) {
                   for (const polygon of otherPlayer.territory) {
                     if (isPointInPolygon(currentPlayerLatLng, polygon)) {
-                      killedByPlayer = otherPlayer;
+                      killedByPlayerTerritory = otherPlayer;
                       break;
                     }
                   }
                 }
-                if (killedByPlayer) break;
+                if (killedByPlayerTerritory) break;
               }
 
-              if (killedByPlayer) {
-                handlePlayerDeath(`You were killed by ${killedByPlayer.username}!`);
+              if (killedByPlayerTerritory) {
+                handlePlayerDeath(`You were killed by ${killedByPlayerTerritory.username}'s territory!`);
                 return [];
               }
 
-              // 4. Check for killing other players by crossing their path
-              if (updatedPath.length >= 2) {
-                const currentPlayerPathTurf = turf.lineString(updatedPath.map(coord => {
-                  const lat = typeof coord[0] === 'number' ? coord[0] : coord.lat;
-                  const lng = typeof coord[1] === 'number' ? coord[1] : coord.lng;
-                  return [lng, lat];
-                }));
+              // NEW CHECK: 4. Check if current player's path crosses another player's territory
+              if (currentPathTurf && otherPlayers.length > 0) {
+                let killedByCrossingTerritory: Player | null = null;
+                for (const otherPlayer of otherPlayers) {
+                  if (otherPlayer.is_alive && otherPlayer.territory && otherPlayer.territory.length > 0) {
+                    for (const polygonCoords of otherPlayer.territory) {
+                      const otherPlayerTerritoryTurfCoords = polygonCoords.map(coord => {
+                        const lat = typeof coord[0] === 'number' ? coord[0] : coord.lat;
+                        const lng = typeof coord[1] === 'number' ? coord[1] : coord.lng;
+                        return [lng, lat];
+                      });
+                      if (otherPlayerTerritoryTurfCoords.length > 0 && (otherPlayerTerritoryTurfCoords[0][0] !== otherPlayerTerritoryTurfCoords[otherPlayerTerritoryTurfCoords.length - 1][0] || otherPlayerTerritoryTurfCoords[0][1] !== otherPlayerTerritoryTurfCoords[otherPlayerTerritoryTurfCoords.length - 1][1])) {
+                        otherPlayerTerritoryTurfCoords.push(otherPlayerTerritoryTurfCoords[0]);
+                      }
+                      if (otherPlayerTerritoryTurfCoords.length >= 4) {
+                        try {
+                          const otherPlayerTerritoryPolygon = turf.polygon([otherPlayerTerritoryTurfCoords]);
+                          if (turf.lineIntersect(currentPathTurf, otherPlayerTerritoryPolygon).features.length > 0) {
+                            killedByCrossingTerritory = otherPlayer;
+                            break;
+                          }
+                        } catch (e) {
+                          console.error("Error checking path intersection with other player's territory:", e, polygonCoords);
+                        }
+                      }
+                    }
+                  }
+                  if (killedByCrossingTerritory) break;
+                }
+                if (killedByCrossingTerritory) {
+                  handlePlayerDeath(`You crossed ${killedByCrossingTerritory.username}'s territory!`);
+                  return [];
+                }
+              }
 
+
+              // 5. Check for killing other players by crossing their path
+              if (currentPathTurf && updatedPath.length >= 2) {
                 for (const otherPlayer of otherPlayers) {
                   if (otherPlayer.is_alive && otherPlayer.current_path && otherPlayer.current_path.length >= 2) {
                     const otherPlayerPathTurf = turf.lineString(otherPlayer.current_path.map(coord => {
@@ -169,7 +205,7 @@ export const useGameLogic = ({
                       return [lng, lat];
                     }));
 
-                    if (turf.lineIntersect(currentPlayerPathTurf, otherPlayerPathTurf).features.length > 0) {
+                    if (turf.lineIntersect(currentPathTurf, otherPlayerPathTurf).features.length > 0) {
                       showSuccess(`You killed ${otherPlayer.username} by crossing their path!`);
                       await supabase
                         .from('players')

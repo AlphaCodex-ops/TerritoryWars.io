@@ -64,7 +64,7 @@ const GamePage = () => {
   });
 
   // Use the custom hook for game actions (claiming territory, respawning)
-  const { handleClaimTerritory, handleRespawn } = useGameActions({
+  const { handleClaimTerritory, handleRespawn, isClaiming, isRespawning } = useGameActions({
     session,
     supabase,
     currentPath,
@@ -98,12 +98,12 @@ const GamePage = () => {
           {username && <span className="text-lg">Player: {username} {isPlayerAlive ? '(Alive)' : '(Dead)'}</span>}
           {username && <span className="text-lg">Score: {playerScore}</span>}
           {isPlayerAlive ? (
-            <Button onClick={handleClaimTerritory} variant="secondary" disabled={currentPath.length < 3}>
-              Claim Territory
+            <Button onClick={handleClaimTerritory} variant="secondary" disabled={currentPath.length < 3 || isClaiming}>
+              {isClaiming ? 'Claiming...' : 'Claim Territory'}
             </Button>
           ) : (
-            <Button onClick={handleRespawn} variant="secondary" disabled={respawnTimer > 0}>
-              {respawnTimer > 0 ? `Respawn in ${respawnTimer}s` : 'Respawn'}
+            <Button onClick={handleRespawn} variant="secondary" disabled={respawnTimer > 0 || isRespawning}>
+              {isRespawning ? 'Respawning...' : (respawnTimer > 0 ? `Respawn in ${respawnTimer}s` : 'Respawn')}
             </Button>
           )}
           <Button onClick={handleLogout} variant="secondary">Logout</Button>
