@@ -11,7 +11,7 @@ export default defineConfig(() => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      // Removed explicit 'react-dom' alias to allow Vite to resolve 'react-dom/client' naturally
+      "react-dom": "react-dom/client", // Explicitly alias react-dom to react-dom/client
     },
   },
   optimizeDeps: {
