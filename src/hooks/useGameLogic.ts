@@ -44,6 +44,7 @@ export const useGameLogic = ({
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [isGpsActive, setIsGpsActive] = useState(false); // New state for GPS activity
 
+  // Define stopWatchingLocation first, as handlePlayerDeath depends on it
   const stopWatchingLocation = useCallback(() => {
     if (watchId.current !== null) {
       navigator.geolocation.clearWatch(watchId.current);
@@ -53,6 +54,18 @@ export const useGameLogic = ({
     }
   }, []);
 
+  // Define handlePlayerDeath next, as startWatchingLocation depends on it
+  const { handlePlayerDeath } = usePlayerDeath({
+    session,
+    supabase,
+    stopWatchingLocation, // Now stopWatchingLocation is defined
+    setCurrentLocation,
+    setCurrentPath,
+    setIsPlayerAlive,
+    setRespawnTimer,
+  });
+
+  // Define startWatchingLocation, now that handlePlayerDeath is available
   const startWatchingLocation = useCallback(() => {
     if (navigator.geolocation) {
       watchId.current = navigator.geolocation.watchPosition(
@@ -249,18 +262,8 @@ export const useGameLogic = ({
       showError('Geolocation is not supported by your browser.');
       setIsGpsActive(false); // Set GPS to inactive if not supported
     }
-  }, [session, supabase, isPlayerAlive, otherPlayers, playerTerritory, handlePlayerDeath, setCurrentPath, setIsPlayerAlive, setRespawnTimer, stopWatchingLocation]);
+  }, [session, supabase, isPlayerAlive, otherPlayers, playerTerritory, handlePlayerDeath, setCurrentPath, setIsGpsActive, showError, showSuccess, setCurrentLocation]);
 
-
-  const { handlePlayerDeath } = usePlayerDeath({
-    session,
-    supabase,
-    stopWatchingLocation,
-    setCurrentLocation,
-    setCurrentPath,
-    setIsPlayerAlive,
-    setRespawnTimer,
-  });
 
   useEffect(() => {
     if (!session) return;
