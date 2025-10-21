@@ -11,12 +11,11 @@ export default defineConfig(() => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      // Explicitly alias 'react-dom' to 'react-dom/client'
-      "react-dom": "react-dom/client",
+      // Make the react-dom alias even more explicit by pointing directly to the client entry
+      "react-dom": path.resolve(__dirname, "./node_modules/react-dom/client"),
     },
   },
   optimizeDeps: {
-    // Removed 'react-dom' from include, relying on the alias to handle resolution
     include: ['react', 'react-dom/client'],
   },
 }));
