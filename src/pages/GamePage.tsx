@@ -5,7 +5,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline, Polygon } fro
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { useSupabase } from '@/components/SessionContextProvider';
-import { showError, showSuccess } from '@/utils/toast';
+import { showError, showSuccess } => '@/utils/toast';
 import { Button } from '@/components/ui/button';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import SetUsernameDialog from '@/components/SetUsernameDialog';
