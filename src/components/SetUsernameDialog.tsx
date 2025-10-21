@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -11,12 +11,21 @@ interface SetUsernameDialogProps {
   userId: string;
   onUsernameSet: (username: string) => void;
   isOpen: boolean;
+  onClose: () => void; // New prop to handle closing the dialog
+  isInitialSetup?: boolean; // New prop to indicate if it's the first time setting username
 }
 
-const SetUsernameDialog: React.FC<SetUsernameDialogProps> = ({ userId, onUsernameSet, isOpen }) => {
+const SetUsernameDialog: React.FC<SetUsernameDialogProps> = ({ userId, onUsernameSet, isOpen, onClose, isInitialSetup = false }) => {
   const { supabase } = useSupabase();
   const [newUsername, setNewUsername] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+
+  // Reset username input when dialog opens
+  useEffect(() => {
+    if (isOpen) {
+      setNewUsername(''); // Clear input when dialog opens
+    }
+  }, [isOpen]);
 
   const handleSaveUsername = async () => {
     if (!newUsername.trim()) {
@@ -36,17 +45,24 @@ const SetUsernameDialog: React.FC<SetUsernameDialogProps> = ({ userId, onUsernam
     } else {
       showSuccess('Username set successfully!');
       onUsernameSet(newUsername.trim());
+      onClose(); // Close the dialog after successful save
     }
     setIsSaving(false);
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={() => { /* Prevent closing without setting username */ }}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!open && !isInitialSetup) {
+        onClose(); // Allow closing if not in initial setup mode
+      }
+      // If it's initial setup and `open` is false, we do nothing,
+      // as it should only close via `onUsernameSet` after a successful save.
+    }}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Set Your Username</DialogTitle>
+          <DialogTitle>{isInitialSetup ? 'Set Your Username' : 'Change Your Username'}</DialogTitle>
           <DialogDescription>
-            Please choose a username to identify yourself in the game.
+            {isInitialSetup ? 'Please choose a username to identify yourself in the game.' : 'Enter a new username.'}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">

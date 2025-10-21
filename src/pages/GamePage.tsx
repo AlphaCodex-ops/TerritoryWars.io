@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, Polygon } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -26,6 +26,8 @@ L.Icon.Default.mergeOptions({
 
 const GamePage = () => {
   const { supabase, session } = useSupabase();
+  const [showChangeUsernameDialog, setShowChangeUsernameDialog] = useState(false);
+
 
   // Use the custom hook for game data fetching and real-time updates
   const {
@@ -106,6 +108,11 @@ const GamePage = () => {
               {isRespawning ? 'Respawning...' : (respawnTimer > 0 ? `Respawn in ${respawnTimer}s` : 'Respawn')}
             </Button>
           )}
+          {username && (
+            <Button onClick={() => setShowChangeUsernameDialog(true)} variant="outline">
+              Change Username
+            </Button>
+          )}
           <Button onClick={handleLogout} variant="secondary">Logout</Button>
         </div>
       </header>
@@ -168,11 +175,13 @@ const GamePage = () => {
         )}
         <Leaderboard />
       </div>
-      {session?.user?.id && isUsernameDialogOpen && (
+      {session?.user?.id && (isUsernameDialogOpen || showChangeUsernameDialog) && (
         <SetUsernameDialog
           userId={session.user.id}
           onUsernameSet={handleUsernameSet}
-          isOpen={isUsernameDialogOpen}
+          isOpen={isUsernameDialogOpen || showChangeUsernameDialog}
+          onClose={() => setShowChangeUsernameDialog(false)}
+          isInitialSetup={isUsernameDialogOpen}
         />
       )}
       <MadeWithDyad />
