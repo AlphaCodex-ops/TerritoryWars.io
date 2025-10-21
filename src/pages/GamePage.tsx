@@ -13,8 +13,8 @@ import Leaderboard from '@/components/Leaderboard';
 import { useGameLogic } from '@/hooks/useGameLogic';
 import { useGameData } from '@/hooks/useGameData';
 import { useGameActions } from '@/hooks/useGameActions';
-import RecenterAutomatically from '@/components/map/RecenterAutomatically'; // Import from new location
-import { Player } from '@/types/game'; // Import shared Player interface
+import RecenterAutomatically from '@/components/map/RecenterAutomatically';
+import { Player } from '@/types/game';
 
 // Fix for default Leaflet icon issues with Webpack/Vite
 delete L.Icon.Default.prototype._getIconUrl;
@@ -164,7 +164,8 @@ const GamePage = () => {
                   <Popup>
                     Player: {player.username} <br /> Lat: {player.current_lat.toFixed(4)}, Lng: {player.current_lng.toFixed(4)}
                   </Popup>
-                </Marker>
+                </Popup>
+              </Marker>
               )}
               {player.territory && player.territory.map((polygon, index) => (
                 <Polygon key={`other-player-${player.user_id}-territory-${index}`} positions={polygon} pathOptions={{ color: 'red', fillColor: 'pink', fillOpacity: 0.3 }} />
