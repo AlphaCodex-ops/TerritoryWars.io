@@ -1,24 +1,11 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Session, SupabaseClient } from '@supabase/supabase-js';
 import L from 'leaflet';
 import { showError } from '@/utils/toast';
 import { RESPAWN_DELAY_SECONDS } from '@/utils/gameConstants';
-
-// Define a type for player data, consistent across hooks and components
-interface Player {
-  id: string;
-  user_id: string;
-  username: string;
-  current_lat: number;
-  current_lng: number;
-  territory: L.LatLngExpression[][];
-  is_alive: boolean;
-  last_killed_at: string | null;
-  score: number;
-  current_path: L.LatLngExpression[];
-}
+import { Player } from '@/types/game'; // Import shared Player interface
 
 interface UseGameDataProps {
   supabase: SupabaseClient;
@@ -34,6 +21,7 @@ export const useGameData = ({ supabase, session }: UseGameDataProps) => {
   const [playerScore, setPlayerScore] = useState(0);
   const [respawnTimer, setRespawnTimer] = useState(0);
   const [currentPath, setCurrentPath] = useState<L.LatLngExpression[]>([]);
+  const respawnIntervalRef = useRef<number | null>(null); // Moved from GamePage
 
   useEffect(() => {
     if (!session) return;
@@ -133,6 +121,34 @@ export const useGameData = ({ supabase, session }: UseGameDataProps) => {
       playersSubscription.unsubscribe();
     };
   }, [session, supabase]);
+
+  // Respawn timer logic moved from GamePage
+  useEffect(() => {
+    if (respawnTimer > 0 && !isPlayerAlive) {
+      respawnIntervalRef.current = window.setInterval(() => {
+        setRespawnTimer((prev) => {
+          if (prev <= 1) {
+            clearInterval(respawnIntervalRef.current!);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else if (respawnTimer === 0 && !isPlayerAlive) {
+      // Timer hit 0, player can respawn
+    } else {
+      if (respawnIntervalRef.current) {
+        clearInterval(respawnIntervalRef.current);
+        respawnIntervalRef.current = null;
+      }
+    }
+
+    return () => {
+      if (respawnIntervalRef.current) {
+        clearInterval(respawnIntervalRef.current);
+      }
+    };
+  }, [respawnTimer, isPlayerAlive, setRespawnTimer]);
 
   const handleUsernameSet = (newUsername: string) => {
     setUsername(newUsername);

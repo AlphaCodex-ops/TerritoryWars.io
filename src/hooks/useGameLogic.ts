@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { Session, SupabaseClient } from '@supabase/supabase-js';
 import L from 'leaflet';
 import * as turf from '@turf/turf';
@@ -9,19 +9,7 @@ import { isPointInPolygon } from '@/utils/geometry';
 import { MIN_CLAIM_AREA_SQ_METERS } from '@/utils/territoryUtils';
 import { usePlayerDeath } from '@/hooks/usePlayerDeath';
 import { RESPAWN_DELAY_SECONDS } from '@/utils/gameConstants';
-
-interface Player {
-  id: string;
-  user_id: string;
-  username: string;
-  current_lat: number;
-  current_lng: number;
-  territory: L.LatLngExpression[][];
-  is_alive: boolean;
-  last_killed_at: string | null;
-  score: number;
-  current_path: L.LatLngExpression[];
-}
+import { Player } from '@/types/game'; // Import shared Player interface
 
 interface UseGameLogicProps {
   session: Session | null;
@@ -30,7 +18,6 @@ interface UseGameLogicProps {
   isPlayerAlive: boolean;
   playerTerritory: L.LatLngExpression[][];
   otherPlayers: Player[];
-  setCurrentLocation: React.Dispatch<React.SetStateAction<{ lat: number; lng: number } | null>>;
   setCurrentPath: React.Dispatch<React.SetStateAction<L.LatLngExpression[]>>;
   setIsPlayerAlive: React.Dispatch<React.SetStateAction<boolean>>;
   setRespawnTimer: React.Dispatch<React.SetStateAction<number>>;
@@ -46,7 +33,6 @@ export const useGameLogic = ({
   isPlayerAlive,
   playerTerritory,
   otherPlayers,
-  setCurrentLocation,
   setCurrentPath,
   setIsPlayerAlive,
   setRespawnTimer,
@@ -55,6 +41,7 @@ export const useGameLogic = ({
   setPlayerScore,
 }: UseGameLogicProps) => {
   const watchId = useRef<number | null>(null);
+  const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null); // Moved from GamePage
 
   const stopWatchingLocation = useCallback(() => {
     if (watchId.current !== null) {
@@ -245,7 +232,7 @@ export const useGameLogic = ({
     return () => {
       stopWatchingLocation();
     };
-  }, [session, supabase, username, isPlayerAlive, otherPlayers, playerTerritory, handlePlayerDeath, setCurrentLocation, setCurrentPath, setIsPlayerAlive, setRespawnTimer, stopWatchingLocation]);
+  }, [session, supabase, username, isPlayerAlive, otherPlayers, playerTerritory, handlePlayerDeath, setCurrentPath, setIsPlayerAlive, setRespawnTimer, stopWatchingLocation]);
 
-  return { stopWatchingLocation, handlePlayerDeath };
+  return { stopWatchingLocation, handlePlayerDeath, currentLocation };
 };

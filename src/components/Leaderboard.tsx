@@ -5,6 +5,7 @@ import { useSupabase } from '@/components/SessionContextProvider';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { Player } from '@/types/game'; // Import shared Player interface
 
 interface PlayerScore {
   user_id: string;
@@ -36,8 +37,8 @@ const Leaderboard: React.FC = () => {
     const playersSubscription = supabase
       .channel('public:players_leaderboard')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, (payload) => {
-        const newPlayer = payload.new as PlayerScore;
-        const oldPlayer = payload.old as PlayerScore;
+        const newPlayer = payload.new as Player;
+        const oldPlayer = payload.old as Player;
 
         setPlayers((prevPlayers) => {
           let updatedPlayers = [...prevPlayers];
