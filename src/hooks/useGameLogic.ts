@@ -41,7 +41,7 @@ export const useGameLogic = ({
   setPlayerScore,
 }: UseGameLogicProps) => {
   const watchId = useRef<number | null>(null);
-  const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null); // Moved from GamePage
+  const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   const stopWatchingLocation = useCallback(() => {
     if (watchId.current !== null) {
@@ -234,5 +234,5 @@ export const useGameLogic = ({
     };
   }, [session, supabase, username, isPlayerAlive, otherPlayers, playerTerritory, handlePlayerDeath, setCurrentPath, setIsPlayerAlive, setRespawnTimer, stopWatchingLocation]);
 
-  return { stopWatchingLocation, handlePlayerDeath, currentLocation };
+  return { stopWatchingLocation, handlePlayerDeath, currentLocation, setCurrentLocation };
 };

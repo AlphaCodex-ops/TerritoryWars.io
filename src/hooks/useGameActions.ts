@@ -22,7 +22,7 @@ interface UseGameActionsProps {
   setIsPlayerAlive: React.Dispatch<React.SetStateAction<boolean>>;
   setRespawnTimer: React.Dispatch<React.SetStateAction<number>>;
   setOtherPlayers: React.Dispatch<React.SetStateAction<Player[]>>;
-  setCurrentLocation: React.Dispatch<React.SetStateAction<{ lat: number; lng: number } | null>>;
+  setCurrentLocation: React.Dispatch<React.SetStateAction<{ lat: number; lng: number } | null>>; // Corrected type
 }
 
 export const useGameActions = ({
@@ -39,7 +39,7 @@ export const useGameActions = ({
   setIsPlayerAlive,
   setRespawnTimer,
   setOtherPlayers,
-  setCurrentLocation,
+  setCurrentLocation, // Destructure the setter
 }: UseGameActionsProps) => {
 
   const handleClaimTerritory = useCallback(async () => {
@@ -221,7 +221,7 @@ export const useGameActions = ({
       setCurrentPath([]);
       setPlayerTerritory([]);
       setPlayerScore(0);
-      setCurrentLocation(null);
+      setCurrentLocation(null); // Correctly reset currentLocation
       setRespawnTimer(0);
     }
   }, [session, supabase, respawnTimer, setIsPlayerAlive, setCurrentPath, setPlayerTerritory, setPlayerScore, setCurrentLocation, setRespawnTimer]);

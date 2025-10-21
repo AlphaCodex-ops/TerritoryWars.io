@@ -48,7 +48,7 @@ const GamePage = () => {
   } = useGameData({ supabase, session });
 
   // Use the custom hook for game logic (GPS tracking, collision detection)
-  const { currentLocation, stopWatchingLocation, handlePlayerDeath } = useGameLogic({
+  const { currentLocation, setCurrentLocation, stopWatchingLocation, handlePlayerDeath } = useGameLogic({
     session,
     supabase,
     username,
@@ -78,7 +78,7 @@ const GamePage = () => {
     setIsPlayerAlive,
     setRespawnTimer,
     setOtherPlayers,
-    setCurrentLocation: (loc) => { /* This setter is now managed by useGameLogic, but useGameActions needs to reset it */ },
+    setCurrentLocation, // Pass the actual setter from useGameLogic
   });
 
   const handleLogout = async () => {
