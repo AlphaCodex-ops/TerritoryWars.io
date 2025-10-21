@@ -73,7 +73,7 @@ const Leaderboard: React.FC = () => {
           ) : (
             <ul className="space-y-2">
               {players.map((player, index) => (
-                <li key={player.user_id} className="flex justify-between items-center text-sm">
+                <li key={player.user_id} className={`flex justify-between items-center text-sm ${!player.is_alive ? 'text-gray-400 italic' : ''}`}>
                   <span className="font-medium">
                     {index + 1}. {player.username} {player.is_alive ? '' : '(Dead)'}
                   </span>

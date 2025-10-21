@@ -15,6 +15,7 @@ import { useGameData } from '@/hooks/useGameData';
 import { useGameActions } from '@/hooks/useGameActions';
 import RecenterAutomatically from '@/components/map/RecenterAutomatically';
 import { Player } from '@/types/game';
+import RespawnOverlay from '@/components/RespawnOverlay'; // Import the new component
 
 // Fix for default Leaflet icon issues with Webpack/Vite
 delete L.Icon.Default.prototype._getIconUrl;
@@ -174,6 +175,12 @@ const GamePage = () => {
           </MapContainer>
         )}
         <Leaderboard />
+        <RespawnOverlay
+          respawnTimer={respawnTimer}
+          isPlayerAlive={isPlayerAlive}
+          onRespawn={handleRespawn}
+          isRespawning={isRespawning}
+        />
       </div>
       {session?.user?.id && (isUsernameDialogOpen || showChangeUsernameDialog) && (
         <SetUsernameDialog
