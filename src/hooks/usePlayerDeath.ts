@@ -5,6 +5,7 @@ import { Session } from '@supabase/supabase-js';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { showError, showSuccess } from '@/utils/toast';
 import L from 'leaflet';
+import { RESPAWN_DELAY_SECONDS } from '@/utils/gameConstants'; // Import from new utility file
 
 interface UsePlayerDeathProps {
   session: Session | null;
@@ -14,7 +15,6 @@ interface UsePlayerDeathProps {
   setCurrentLocation: React.Dispatch<React.SetStateAction<{ lat: number; lng: number } | null>>;
   setIsPlayerAlive: React.Dispatch<React.SetStateAction<boolean>>;
   setRespawnTimer: React.Dispatch<React.SetStateAction<number>>;
-  RESPAWN_DELAY_SECONDS: number;
 }
 
 export const usePlayerDeath = ({
@@ -25,7 +25,6 @@ export const usePlayerDeath = ({
   setCurrentLocation,
   setIsPlayerAlive,
   setRespawnTimer,
-  RESPAWN_DELAY_SECONDS,
 }: UsePlayerDeathProps) => {
   const handlePlayerDeath = useCallback(async (reason: string) => {
     if (!session?.user?.id) return;
@@ -49,7 +48,7 @@ export const usePlayerDeath = ({
         updated_at: new Date().toISOString(),
       })
       .eq('user_id', session.user.id);
-  }, [session, supabase, stopWatchingLocation, setCurrentPath, setCurrentLocation, setIsPlayerAlive, setRespawnTimer, RESPAWN_DELAY_SECONDS]);
+  }, [session, supabase, stopWatchingLocation, setCurrentPath, setCurrentLocation, setIsPlayerAlive, setRespawnTimer]);
 
   return { handlePlayerDeath };
 };

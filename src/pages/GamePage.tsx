@@ -13,7 +13,8 @@ import { isPointInPolygon } from '@/utils/geometry';
 import Leaderboard from '@/components/Leaderboard';
 import * as turf from '@turf/turf';
 import { turfFeatureToLatLngExpression, calculateScore, MIN_CLAIM_AREA_SQ_METERS } from '@/utils/territoryUtils';
-import { usePlayerDeath } from '@/hooks/usePlayerDeath'; // Import the new hook
+import { usePlayerDeath } from '@/hooks/usePlayerDeath';
+import { RESPAWN_DELAY_SECONDS } from '@/utils/gameConstants'; // Import from new utility file
 
 // Fix for default Leaflet icon issues with Webpack/Vite
 delete L.Icon.Default.prototype._getIconUrl;
@@ -48,8 +49,6 @@ const RecenterAutomatically = ({ lat, lng }: { lat: number; lng: number }) => {
   return null;
 };
 
-const RESPAWN_DELAY_SECONDS = 10; // 10-second respawn delay
-
 const GamePage = () => {
   const { supabase, session } = useSupabase();
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -82,7 +81,6 @@ const GamePage = () => {
     setCurrentLocation,
     setIsPlayerAlive,
     setRespawnTimer,
-    RESPAWN_DELAY_SECONDS,
   });
 
   useEffect(() => {
@@ -298,7 +296,7 @@ const GamePage = () => {
                           score: 0,
                           updated_at: new Date().toISOString(),
                         })
-                        .eq('user_id', otherPlayer.user_id);
+                        .eq('user_id', otherPlayer.user.id);
                     }
                   }
                 }
