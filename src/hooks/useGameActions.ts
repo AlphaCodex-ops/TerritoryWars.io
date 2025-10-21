@@ -94,6 +94,31 @@ export const useGameActions = ({
         return;
       }
 
+      // NEW LOGIC: Check for other players inside the newly claimed territory
+      if (newlyClaimedTurfPolygon) {
+        for (const otherPlayer of otherPlayers) {
+          if (otherPlayer.is_alive && otherPlayer.current_lat !== null && otherPlayer.current_lng !== null) {
+            const otherPlayerPoint = turf.point([otherPlayer.current_lng, otherPlayer.current_lat]);
+            if (turf.booleanPointInPolygon(otherPlayerPoint, newlyClaimedTurfPolygon)) {
+              showSuccess(`You killed ${otherPlayer.username} by enclosing them in your new territory!`);
+              await supabase
+                .from('players')
+                .update({
+                  is_alive: false,
+                  current_lat: null,
+                  current_lng: null,
+                  last_killed_at: new Date().toISOString(),
+                  current_path: [],
+                  territory: [], // Clear territory on death
+                  score: 0, // Reset score on death
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('user_id', otherPlayer.user_id);
+            }
+          }
+        }
+      }
+
       // 2. Update other players' territories (capture logic)
       const updatedOtherPlayersState = [...otherPlayers];
       for (let i = 0; i < updatedOtherPlayersState.length; i++) {
