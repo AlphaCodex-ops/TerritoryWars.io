@@ -1,6 +1,8 @@
 import L from 'leaflet';
 import * as turf from '@turf/turf';
 
+export const MIN_CLAIM_AREA_SQ_METERS = 100; // Minimum area in square meters for a valid territory claim
+
 /**
  * Helper function to convert Turf.js Polygon/MultiPolygon Feature to L.LatLngExpression[][]
  * @param feature A Turf.js Polygon or MultiPolygon feature.
