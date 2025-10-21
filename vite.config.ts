@@ -11,9 +11,8 @@ export default defineConfig(() => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      "react": path.resolve(__dirname, "node_modules/react"),
-      // Explicitly alias react-dom/client to its exact path
-      "react-dom/client": path.resolve(__dirname, "node_modules/react-dom/client"),
+      // Removed explicit aliases for 'react' and 'react-dom/client'
+      // to allow default module resolution to take effect.
     },
   },
 }));
