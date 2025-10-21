@@ -11,9 +11,11 @@ export default defineConfig(() => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // Explicitly alias 'react-dom' to 'react-dom/client'
+      "react-dom": "react-dom/client",
     },
   },
   optimizeDeps: {
-    include: ['react', 'react-dom/client'], // Explicitly include for optimization
+    include: ['react', 'react-dom/client'],
   },
 }));
