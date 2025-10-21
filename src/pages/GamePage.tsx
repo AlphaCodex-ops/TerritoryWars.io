@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline, Polygon } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, Polygon } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { useSupabase } from '@/components/SessionContextProvider';
@@ -12,7 +12,8 @@ import SetUsernameDialog from '@/components/SetUsernameDialog';
 import Leaderboard from '@/components/Leaderboard';
 import { useGameLogic } from '@/hooks/useGameLogic';
 import { useGameData } from '@/hooks/useGameData';
-import { useGameActions } from '@/hooks/useGameActions'; // Import the new hook
+import { useGameActions } from '@/hooks/useGameActions';
+import RecenterAutomatically from '@/components/map/RecenterAutomatically'; // Import from new location
 import { Player } from '@/types/game'; // Import shared Player interface
 
 // Fix for default Leaflet icon issues with Webpack/Vite
@@ -22,17 +23,6 @@ L.Icon.Default.mergeOptions({
   iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
   shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
 });
-
-// Component to update map view to current location
-const RecenterAutomatically = ({ lat, lng }: { lat: number; lng: number }) => {
-  const map = useMap();
-  useEffect(() => {
-    if (lat && lng) {
-      map.setView([lat, lng], map.getZoom());
-    }
-  }, [lat, lng, map]);
-  return null;
-};
 
 const GamePage = () => {
   const { supabase, session } = useSupabase();
@@ -47,7 +37,6 @@ const GamePage = () => {
     playerScore,
     respawnTimer,
     currentPath,
-    setUsername, // Pass setter to useGameActions if needed, or handleUsernameSet directly
     setIsUsernameDialogOpen,
     setOtherPlayers,
     setPlayerTerritory,
