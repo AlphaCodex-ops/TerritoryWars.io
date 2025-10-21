@@ -9,7 +9,7 @@ interface GameHeaderProps {
   username: string | null;
   isPlayerAlive: boolean;
   playerScore: number;
-  currentPathLength: number;
+  currentPathLength: number; // Added currentPathLength
   isClaiming: boolean;
   respawnTimer: number;
   isRespawning: boolean;
@@ -25,7 +25,7 @@ const GameHeader: React.FC<GameHeaderProps> = ({
   username,
   isPlayerAlive,
   playerScore,
-  currentPathLength,
+  currentPathLength, // Destructure currentPathLength
   isClaiming,
   respawnTimer,
   isRespawning,
@@ -42,6 +42,7 @@ const GameHeader: React.FC<GameHeaderProps> = ({
       <div className="flex flex-wrap items-center space-x-2 sm:space-x-4 gap-y-2">
         {username && <span className="text-lg">Player: {username} {isPlayerAlive ? '(Alive)' : '(Dead)'}</span>}
         {username && <span className="text-lg">Score: {playerScore}</span>}
+        {isPlayerAlive && <span className="text-lg">Path: {currentPathLength} points</span>} {/* Display path length */}
         {isPlayerAlive ? (
           <Button onClick={onClaimTerritory} variant="secondary" disabled={currentPathLength < 3 || isClaiming || !isGpsActive}>
             {isClaiming ? 'Claiming...' : 'Claim Territory'}
