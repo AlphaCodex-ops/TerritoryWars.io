@@ -15,9 +15,10 @@ import { useGameData } from '@/hooks/useGameData';
 import { useGameActions } from '@/hooks/useGameActions';
 import RecenterAutomatically from '@/components/map/RecenterAutomatically';
 import GpsStatusIndicator from '@/components/map/GpsStatusIndicator';
-import PathStartMarker from '@/components/map/PathStartMarker'; // New import
+import PathStartMarker from '@/components/map/PathStartMarker';
 import { Player } from '@/types/game';
 import RespawnOverlay from '@/components/RespawnOverlay';
+import HowToPlayDialog from '@/components/HowToPlayDialog'; // New import
 
 // Fix for default Leaflet icon issues with Webpack/Vite
 delete L.Icon.Default.prototype._getIconUrl;
@@ -131,6 +132,7 @@ const GamePage = () => {
               Change Username
             </Button>
           )}
+          <HowToPlayDialog /> {/* Added HowToPlayDialog */}
           <Button onClick={handleLogout} variant="secondary">Logout</Button>
         </div>
       </header>
@@ -171,7 +173,7 @@ const GamePage = () => {
             {isPlayerAlive && currentPath.length > 1 && (
               <>
                 <Polyline positions={currentPath} pathOptions={{ color: 'blue', weight: 5 }} />
-                <PathStartMarker position={currentPath[0]} /> {/* Render PathStartMarker */}
+                <PathStartMarker position={currentPath[0]} />
               </>
             )}
 
