@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import { Session, SupabaseClient } from '@supabase/supabase-js';
 import L from 'leaflet';
 import * as turf from '@turf/turf';
+import { Feature, Polygon, MultiPolygon } from '@turf/helpers'; // Correct import for Turf.js types
 import { showError, showSuccess } from '@/utils/toast';
 import { turfFeatureToLatLngExpression, calculateScore, MIN_CLAIM_AREA_SQ_METERS } from '@/utils/territoryUtils';
 import { Player } from '@/types/game'; // Import shared Player interface
@@ -74,7 +75,7 @@ export const useGameActions = ({
         newClaimCoords.push(newClaimCoords[0]);
       }
 
-      let newlyClaimedTurfPolygon: turf.Feature<turf.Polygon> | null = null;
+      let newlyClaimedTurfPolygon: Feature<Polygon> | null = null;
       if (newClaimCoords.length >= 4) {
         try {
           newlyClaimedTurfPolygon = turf.polygon([newClaimCoords]);
@@ -145,6 +146,7 @@ export const useGameActions = ({
                   changed = true;
                   showSuccess(`You captured a piece of ${otherPlayer.username}'s territory!`);
                   
+                  // turf.difference expects two Feature<Polygon> or Feature<MultiPolygon>
                   const remainingTurf = turf.difference(existingTurfPolygon, newlyClaimedTurfPolygon);
                   remainingTerritory.push(...turfFeatureToLatLngExpression(remainingTurf));
                 } else {
@@ -173,7 +175,7 @@ export const useGameActions = ({
       setOtherPlayers(updatedOtherPlayersState);
 
       // 3. Update current player's territory and score
-      let currentPlayersCombinedTurf: turf.Feature<turf.Polygon | turf.MultiPolygon> | null = newlyClaimedTurfPolygon;
+      let currentPlayersCombinedTurf: Feature<Polygon | MultiPolygon> | null = newlyClaimedTurfPolygon;
 
       for (const existingPolygonCoords of playerTerritory) {
         const existingTurfPolygonCoords = existingPolygonCoords.map(coord => {
