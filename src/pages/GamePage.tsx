@@ -78,7 +78,7 @@ const GamePage = () => {
     setIsPlayerAlive,
     setRespawnTimer,
     setOtherPlayers,
-    setCurrentLocation, // Pass the actual setter from useGameLogic
+    setCurrentLocation,
   });
 
   const handleLogout = async () => {
@@ -164,8 +164,7 @@ const GamePage = () => {
                   <Popup>
                     Player: {player.username} <br /> Lat: {player.current_lat.toFixed(4)}, Lng: {player.current_lng.toFixed(4)}
                   </Popup>
-                </Popup>
-              </Marker>
+                </Marker>
               )}
               {player.territory && player.territory.map((polygon, index) => (
                 <Polygon key={`other-player-${player.user_id}-territory-${index}`} positions={polygon} pathOptions={{ color: 'red', fillColor: 'pink', fillOpacity: 0.3 }} />
