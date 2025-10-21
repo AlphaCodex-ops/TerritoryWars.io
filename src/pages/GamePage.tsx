@@ -14,7 +14,6 @@ import { useGameLogic } from '@/hooks/useGameLogic';
 import { useGameData } from '@/hooks/useGameData';
 import { useGameActions } from '@/hooks/useGameActions';
 import RecenterAutomatically from '@/components/map/RecenterAutomatically';
-import GpsLoadingOverlay from '@/components/GpsLoadingOverlay'; // Import the new component
 import { Player } from '@/types/game';
 
 // Fix for default Leaflet icon issues with Webpack/Vite
@@ -113,11 +112,17 @@ const GamePage = () => {
 
       <div className="flex-grow relative">
         {!currentLocation && isPlayerAlive ? (
-          <GpsLoadingOverlay
-            session={session}
-            isUsernameDialogOpen={isUsernameDialogOpen}
-            handleUsernameSet={handleUsernameSet}
-          />
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white p-4 z-[1001]">
+            <h1 className="text-3xl font-bold mb-4">Waiting for GPS location...</h1>
+            <p className="text-lg text-center">Please ensure location services are enabled and grant permission.</p>
+            {session?.user?.id && (
+              <SetUsernameDialog
+                userId={session.user.id}
+                onUsernameSet={handleUsernameSet}
+                isOpen={isUsernameDialogOpen}
+              />
+            )}
+          </div>
         ) : (
           <MapContainer
             center={[currentLocation?.lat || 0, currentLocation?.lng || 0]}
@@ -170,7 +175,7 @@ const GamePage = () => {
         )}
         <Leaderboard />
       </div>
-      {session?.user?.id && !(!currentLocation && isPlayerAlive) && ( // Only show dialog if not already handled by overlay
+      {session?.user?.id && isUsernameDialogOpen && currentLocation && (
         <SetUsernameDialog
           userId={session.user.id}
           onUsernameSet={handleUsernameSet}
