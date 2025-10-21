@@ -48,6 +48,22 @@ const RecenterAutomatically = ({ lat, lng }: { lat: number; lng: number }) => {
 
 const RESPAWN_DELAY_SECONDS = 10; // 10-second respawn delay
 
+// Helper function to convert Turf.js Polygon/MultiPolygon Feature to L.LatLngExpression[][]
+const turfFeatureToLatLngExpression = (feature: turf.Feature<turf.Polygon | turf.MultiPolygon> | null): L.LatLngExpression[][] => {
+  if (!feature) return [];
+  const result: L.LatLngExpression[][] = [];
+  if (feature.geometry.type === 'Polygon') {
+    const coords = feature.geometry.coordinates[0].map(c => [c[1], c[0]] as L.LatLngExpression);
+    if (coords.length >= 3) result.push(coords);
+  } else if (feature.geometry.type === 'MultiPolygon') {
+    feature.geometry.coordinates.forEach(poly => {
+      const coords = poly[0].map(c => [c[1], c[0]] as L.LatLngExpression);
+      if (coords.length >= 3) result.push(coords);
+    });
+  }
+  return result;
+};
+
 const GamePage = () => {
   const { supabase, session } = useSupabase();
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -444,21 +460,21 @@ const GamePage = () => {
       return;
     }
 
-    // 1. Create the new polygon for the current player
-    const newPlayerPolygonCoords = currentPath.map(coord => {
+    // 1. Create the new polygon from the current path
+    const newClaimCoords = currentPath.map(coord => {
       const lat = typeof coord[0] === 'number' ? coord[0] : coord.lat;
       const lng = typeof coord[1] === 'number' ? coord[1] : coord.lng;
       return [lng, lat];
     });
     // Ensure the polygon is closed
-    if (newPlayerPolygonCoords.length > 0 && (newPlayerPolygonCoords[0][0] !== newPlayerPolygonCoords[newPlayerPolygonCoords.length - 1][0] || newPlayerPolygonCoords[0][1] !== newPlayerPolygonCoords[newPlayerPolygonCoords.length - 1][1])) {
-      newPlayerPolygonCoords.push(newPlayerPolygonCoords[0]);
+    if (newClaimCoords.length > 0 && (newClaimCoords[0][0] !== newClaimCoords[newClaimCoords.length - 1][0] || newClaimCoords[0][1] !== newClaimCoords[newClaimCoords.length - 1][1])) {
+      newClaimCoords.push(newClaimCoords[0]);
     }
 
     let newlyClaimedTurfPolygon: turf.Feature<turf.Polygon> | null = null;
-    if (newPlayerPolygonCoords.length >= 4) {
+    if (newClaimCoords.length >= 4) {
       try {
-        newlyClaimedTurfPolygon = turf.polygon([newPlayerPolygonCoords]);
+        newlyClaimedTurfPolygon = turf.polygon([newClaimCoords]);
       } catch (e) {
         showError('Invalid polygon formed by your path.');
         console.error('Error creating turf polygon from current path:', e);
@@ -470,7 +486,7 @@ const GamePage = () => {
     }
 
     // 2. Update other players' territories (capture logic)
-    const updatedOtherPlayersState = [...otherPlayers]; // Create a mutable copy for local state update
+    const updatedOtherPlayersState = [...otherPlayers];
     for (let i = 0; i < updatedOtherPlayersState.length; i++) {
       const otherPlayer = updatedOtherPlayersState[i];
       if (otherPlayer.is_alive && otherPlayer.user_id !== session?.user?.id) {
@@ -497,24 +513,7 @@ const GamePage = () => {
                 showSuccess(`You captured a piece of ${otherPlayer.username}'s territory!`);
                 
                 const remainingTurf = turf.difference(existingTurfPolygon, newlyClaimedTurfPolygon);
-
-                if (remainingTurf) {
-                  if (remainingTurf.geometry.type === 'Polygon') {
-                    // Convert Polygon to L.LatLngExpression[][]
-                    const newCoords = remainingTurf.geometry.coordinates[0].map(c => [c[1], c[0]] as L.LatLngExpression);
-                    if (newCoords.length >= 3) { // A valid Leaflet polygon needs at least 3 points
-                      remainingTerritory.push(newCoords);
-                    }
-                  } else if (remainingTurf.geometry.type === 'MultiPolygon') {
-                    // Convert MultiPolygon to L.LatLngExpression[][]
-                    remainingTurf.geometry.coordinates.forEach(poly => {
-                      const newCoords = poly[0].map(c => [c[1], c[0]] as L.LatLngExpression);
-                      if (newCoords.length >= 3) {
-                        remainingTerritory.push(newCoords);
-                      }
-                    });
-                  }
-                }
+                remainingTerritory.push(...turfFeatureToLatLngExpression(remainingTurf));
               } else {
                 remainingTerritory.push(existingPolygonCoords);
               }
@@ -534,21 +533,46 @@ const GamePage = () => {
             .update({ territory: remainingTerritory, score: newOtherPlayerScore, updated_at: new Date().toISOString() })
             .eq('user_id', otherPlayer.user_id);
           
-          // Update the local state for this specific other player
           updatedOtherPlayersState[i] = { ...otherPlayer, territory: remainingTerritory, score: newOtherPlayerScore };
         }
       }
     }
-    setOtherPlayers(updatedOtherPlayersState); // Update local state for all other players
+    setOtherPlayers(updatedOtherPlayersState);
 
     // 3. Update current player's territory and score
-    const newTerritory = [...playerTerritory, currentPath];
-    const newScore = calculateScore(newTerritory);
+    let currentPlayersCombinedTurf: turf.Feature<turf.Polygon | turf.MultiPolygon> | null = newlyClaimedTurfPolygon;
+
+    for (const existingPolygonCoords of playerTerritory) {
+      const existingTurfPolygonCoords = existingPolygonCoords.map(coord => {
+        const lat = typeof coord[0] === 'number' ? coord[0] : coord.lat;
+        const lng = typeof coord[1] === 'number' ? coord[1] : coord.lng;
+        return [lng, lat];
+      });
+      if (existingTurfPolygonCoords.length > 0 && (existingTurfPolygonCoords[0][0] !== existingTurfPolygonCoords[existingTurfPolygonCoords.length - 1][0] || existingTurfPolygonCoords[0][1] !== existingTurfPolygonCoords[existingTurfPolygonCoords.length - 1][1])) {
+        existingTurfPolygonCoords.push(existingTurfPolygonCoords[0]);
+      }
+
+      if (existingTurfPolygonCoords.length >= 4) {
+        try {
+          const existingTurfPolygon = turf.polygon([existingTurfPolygonCoords]);
+          if (currentPlayersCombinedTurf) {
+            currentPlayersCombinedTurf = turf.union(currentPlayersCombinedTurf, existingTurfPolygon);
+          } else {
+            currentPlayersCombinedTurf = existingTurfPolygon;
+          }
+        } catch (e) {
+          console.error("Error uniting with existing player territory:", e, existingPolygonCoords);
+        }
+      }
+    }
+
+    const newPlayerTerritory = turfFeatureToLatLngExpression(currentPlayersCombinedTurf);
+    const newScore = calculateScore(newPlayerTerritory);
 
     const { error } = await supabase
       .from('players')
       .update({
-        territory: newTerritory,
+        territory: newPlayerTerritory,
         score: newScore,
         current_path: [], // Clear current path after claiming territory
         updated_at: new Date().toISOString()
@@ -560,7 +584,7 @@ const GamePage = () => {
       console.error('Error claiming territory:', error);
     } else {
       showSuccess('Territory claimed successfully!');
-      setPlayerTerritory(newTerritory);
+      setPlayerTerritory(newPlayerTerritory);
       setPlayerScore(newScore);
       setCurrentPath([]);
     }
