@@ -184,7 +184,7 @@ export const useGameLogic = ({
             }
 
 
-            // 5. Check for killing other players by crossing their path
+            // NEW CHECK: 5. Check for killing other players by crossing their path
             if (currentPathTurf && updatedPath.length >= 2) {
               for (const otherPlayer of otherPlayers) {
                 if (otherPlayer.is_alive && otherPlayer.current_path && otherPlayer.current_path.length >= 2) {
