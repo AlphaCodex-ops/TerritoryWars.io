@@ -12,8 +12,8 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "jsx": "react-jsx", // Changed to react-jsx
-    "jsxImportSource": "react", // Added jsxImportSource
+    "jsx": "react-jsxdev", // Explicitly set for development JSX runtime
+    "jsxImportSource": "react", // Explicitly set the import source
 
     /* Linting */
     "strict": true,
