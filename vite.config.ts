@@ -16,6 +16,7 @@ export default defineConfig(() => ({
     },
   },
   optimizeDeps: {
-    include: ['react', 'react-dom', 'react-dom/client'], // Added 'react-dom' here
+    // Removed 'react-dom' from include, relying on the alias to handle resolution
+    include: ['react', 'react-dom/client'],
   },
 }));
