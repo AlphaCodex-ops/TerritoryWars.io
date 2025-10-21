@@ -3,18 +3,10 @@
 import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { useSupabase } from '@/components/SessionContextProvider';
-import { useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
+// Removed useNavigate and useEffect as redirection is now handled in App.tsx
 
 const Login = () => {
-  const { supabase, session } = useSupabase();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (session) {
-      navigate('/');
-    }
-  }, [session, navigate]);
+  const { supabase } = useSupabase(); // Removed session as it's not needed for redirection here
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
