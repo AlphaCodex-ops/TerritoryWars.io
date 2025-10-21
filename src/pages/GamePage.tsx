@@ -18,7 +18,8 @@ import GpsStatusIndicator from '@/components/map/GpsStatusIndicator';
 import PathStartMarker from '@/components/map/PathStartMarker';
 import { Player } from '@/types/game';
 import RespawnOverlay from '@/components/RespawnOverlay';
-import HowToPlayDialog from '@/components/HowToPlayDialog'; // New import
+import HowToPlayDialog from '@/components/HowToPlayDialog';
+import GameHeader from '@/components/GameHeader'; // New import
 
 // Fix for default Leaflet icon issues with Webpack/Vite
 delete L.Icon.Default.prototype._getIconUrl;
@@ -33,7 +34,6 @@ const DEFAULT_MAP_CENTER: L.LatLngExpression = [51.505, -0.09]; // Example: Lond
 const GamePage = () => {
   const { supabase, session } = useSupabase();
   const [showChangeUsernameDialog, setShowChangeUsernameDialog] = useState(false);
-
 
   // Use the custom hook for game data fetching and real-time updates
   const {
@@ -108,34 +108,21 @@ const GamePage = () => {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="bg-primary text-primary-foreground p-4 flex justify-between items-center shadow-md">
-        <h1 className="text-xl font-bold">Paper.io GPS Game</h1>
-        <div className="flex items-center space-x-4">
-          {username && <span className="text-lg">Player: {username} {isPlayerAlive ? '(Alive)' : '(Dead)'}</span>}
-          {username && <span className="text-lg">Score: {playerScore}</span>}
-          {isPlayerAlive ? (
-            <Button onClick={handleClaimTerritory} variant="secondary" disabled={currentPath.length < 3 || isClaiming || !isGpsActive}>
-              {isClaiming ? 'Claiming...' : 'Claim Territory'}
-            </Button>
-          ) : (
-            <Button onClick={handleRespawn} variant="secondary" disabled={respawnTimer > 0 || isRespawning}>
-              {isRespawning ? 'Respawning...' : (respawnTimer > 0 ? `Respawn in ${respawnTimer}s` : 'Respawn')}
-            </Button>
-          )}
-          {username && (
-            <Button onClick={toggleGpsTracking} variant="outline">
-              {isGpsActive ? 'Stop GPS' : 'Start GPS'}
-            </Button>
-          )}
-          {username && (
-            <Button onClick={() => setShowChangeUsernameDialog(true)} variant="outline">
-              Change Username
-            </Button>
-          )}
-          <HowToPlayDialog /> {/* Added HowToPlayDialog */}
-          <Button onClick={handleLogout} variant="secondary">Logout</Button>
-        </div>
-      </header>
+      <GameHeader
+        username={username}
+        isPlayerAlive={isPlayerAlive}
+        playerScore={playerScore}
+        currentPathLength={currentPath.length}
+        isClaiming={isClaiming}
+        respawnTimer={respawnTimer}
+        isRespawning={isRespawning}
+        isGpsActive={isGpsActive}
+        onClaimTerritory={handleClaimTerritory}
+        onRespawn={handleRespawn}
+        onToggleGpsTracking={toggleGpsTracking}
+        onShowChangeUsernameDialog={() => setShowChangeUsernameDialog(true)}
+        onLogout={handleLogout}
+      />
 
       <div className="flex-grow relative">
         {!currentLocation && isPlayerAlive && isGpsActive ? (
